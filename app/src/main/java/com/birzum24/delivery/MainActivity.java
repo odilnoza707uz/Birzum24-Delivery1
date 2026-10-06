@@ -25,6 +25,8 @@ import androidx.core.content.ContextCompat;
 import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsControllerCompat;
 
+import com.google.firebase.messaging.FirebaseMessaging;
+
 import org.json.JSONObject;
 
 public class MainActivity extends AppCompatActivity {
@@ -75,6 +77,11 @@ public class MainActivity extends AppCompatActivity {
         requestNotificationPermission();
         requestLocationPermission();
 
+        /*
+         * FCM tokenni olish.
+         */
+        getFcmToken();
+
         setupBackButton();
 
         webView.loadUrl(URL);
@@ -103,9 +110,6 @@ public class MainActivity extends AppCompatActivity {
         settings.setLoadWithOverviewMode(false);
         settings.setUseWideViewPort(false);
 
-        /*
-         * Cookie.
-         */
         CookieManager cookieManager =
                 CookieManager.getInstance();
 
@@ -131,9 +135,6 @@ public class MainActivity extends AppCompatActivity {
 
                         syncSessionAndTracking();
 
-                        /*
-                         * Login/PIN holati o'zgarishi mumkin.
-                         */
                         view.postDelayed(
                                 MainActivity.this::syncSessionAndTracking,
                                 3000
@@ -219,6 +220,37 @@ public class MainActivity extends AppCompatActivity {
     }
 
     /*
+     * Firebase FCM tokenini olamiz.
+     */
+    private void getFcmToken() {
+
+        FirebaseMessaging.getInstance()
+                .getToken()
+                .addOnCompleteListener(task -> {
+
+                    if (!task.isSuccessful()) {
+                        return;
+                    }
+
+                    String token = task.getResult();
+
+                    if (token == null || token.trim().isEmpty()) {
+                        return;
+                    }
+
+                    prefs.edit()
+                            .putString("fcm_token", token)
+                            .apply();
+
+                    /*
+                     * Agar WebView allaqachon login bo'lgan bo'lsa,
+                     * tokenni serverga yuborishga harakat qilamiz.
+                     */
+                    syncSessionAndTracking();
+                });
+    }
+
+    /*
      * WebView'dan PHP session cookie +
      * CSRF tokenni olamiz.
      */
@@ -238,10 +270,6 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
 
-        /*
-         * PHP:
-         * POST /c/api.php?a=state
-         */
         String js =
                 "(async function(){"
                         + "try{"
@@ -270,10 +298,6 @@ public class MainActivity extends AppCompatActivity {
 
                         String clean = result;
 
-                        /*
-                         * evaluateJavascript JSON string
-                         * formatini tozalash.
-                         */
                         if (clean.startsWith("\"")
                                 && clean.endsWith("\"")) {
 
@@ -328,13 +352,16 @@ public class MainActivity extends AppCompatActivity {
                                 .apply();
 
                         /*
-                         * Faqat courier ready bo'lganda
-                         * GPS service ishga tushadi.
+                         * FCM tokenni faqat courier ready
+                         * bo'lganda serverga yuboramiz.
                          */
-                        if ("ready".equals(stage)
-                                && hasLocationPermission()) {
+                        if ("ready".equals(stage)) {
 
-                            startLocationService();
+                            syncFcmTokenToServer(csrf);
+
+                            if (hasLocationPermission()) {
+                                startLocationService();
+                            }
                         }
 
                     } catch (Exception e) {
@@ -346,6 +373,78 @@ public class MainActivity extends AppCompatActivity {
                     }
                 }
         );
+    }
+
+    /*
+     * FCM tokenni PHP API'ga yuborish.
+     *
+     * /c/api.php?a=fcm_token
+     *
+     * Bu endpointni keyingi bosqichda PHP'ga qo'shamiz.
+     */
+    private void syncFcmTokenToServer(String csrf) {
+
+        String token =
+                prefs.getString("fcm_token", "");
+
+        if (token == null || token.trim().isEmpty()) {
+            return;
+        }
+
+        try {
+
+            JSONObject body =
+                    new JSONObject();
+
+            body.put("token", token);
+
+            String bodyJson =
+                    body.toString();
+
+            /*
+             * Java string ichida JS uchun
+             * xavfsiz JSON.
+             */
+            String escaped =
+                    JSONObject.quote(bodyJson);
+
+            String csrfEscaped =
+                    JSONObject.quote(csrf);
+
+            String js =
+                    "(async function(){"
+                            + "try{"
+                            + "const r=await fetch('/c/api.php?a=fcm_token',{"
+                            + "method:'POST',"
+                            + "credentials:'include',"
+                            + "headers:{"
+                            + "'Content-Type':'application/json',"
+                            + "'X-CSRF-Token':" + csrfEscaped
+                            + "},"
+                            + "body:" + escaped
+                            + "});"
+                            + "const j=await r.json();"
+                            + "return JSON.stringify(j);"
+                            + "}catch(e){"
+                            + "return JSON.stringify({ok:false,error:String(e)});"
+                            + "}"
+                            + "})()";
+
+            webView.evaluateJavascript(
+                    js,
+                    result -> {
+                        /*
+                         * Hozircha javobni ko'rsatmaymiz.
+                         */
+                    }
+            );
+
+        } catch (Exception e) {
+
+            /*
+             * FCM xatosi ilovani yiqitmasin.
+             */
+        }
     }
 
     private boolean hasLocationPermission() {
@@ -395,11 +494,6 @@ public class MainActivity extends AppCompatActivity {
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
 
-            /*
-             * Android 11+ da background location
-             * foydalanuvchi tomonidan Settings orqali
-             * beriladi.
-             */
             new AlertDialog.Builder(this)
                     .setTitle(
                             "Fonda joylashuvga ruxsat"
@@ -563,136 +657,4 @@ public class MainActivity extends AppCompatActivity {
 
         super.onRequestPermissionsResult(
                 requestCode,
-                permissions,
-                grantResults
-        );
-
-        if (requestCode == LOCATION_REQUEST) {
-
-            if (hasLocationPermission()) {
-
-                Toast.makeText(
-                        this,
-                        "Joylashuvga ruxsat berildi",
-                        Toast.LENGTH_SHORT
-                ).show();
-
-                /*
-                 * Android 10+ background location.
-                 */
-                requestBackgroundLocationPermission();
-
-                syncSessionAndTracking();
-
-            } else {
-
-                Toast.makeText(
-                        this,
-                        "Joylashuvga ruxsat berilmasa kuryer tracking ishlamaydi.",
-                        Toast.LENGTH_LONG
-                ).show();
-            }
-        }
-
-        if (requestCode == BACKGROUND_LOCATION_REQUEST) {
-
-            if (hasLocationPermission()) {
-
-                syncSessionAndTracking();
-            }
-        }
-
-        if (requestCode == NOTIFICATION_REQUEST) {
-
-            if (ContextCompat.checkSelfPermission(
-                    this,
-                    Manifest.permission.POST_NOTIFICATIONS
-            ) == PackageManager.PERMISSION_GRANTED) {
-
-                Toast.makeText(
-                        this,
-                        "Bildirishnomalarga ruxsat berildi",
-                        Toast.LENGTH_SHORT
-                ).show();
-
-            } else {
-
-                Toast.makeText(
-                        this,
-                        "Bildirishnoma ruxsati berilmadi.",
-                        Toast.LENGTH_SHORT
-                ).show();
-            }
-        }
-
-        if (requestCode == CAMERA_REQUEST) {
-
-            if (ContextCompat.checkSelfPermission(
-                    this,
-                    Manifest.permission.CAMERA
-            ) == PackageManager.PERMISSION_GRANTED) {
-
-                Toast.makeText(
-                        this,
-                        "Kameraga ruxsat berildi",
-                        Toast.LENGTH_SHORT
-                ).show();
-
-                /*
-                 * WebView permission request oldin
-                 * yuborilgan bo'lishi mumkin.
-                 *
-                 * Sahifani qayta yuklash orqali
-                 * kamera permissionini yangilaymiz.
-                 */
-                if (webView != null) {
-                    webView.reload();
-                }
-
-            } else {
-
-                Toast.makeText(
-                        this,
-                        "Kameraga ruxsat berilmadi.",
-                        Toast.LENGTH_SHORT
-                ).show();
-            }
-        }
-    }
-
-    @Override
-    protected void onResume() {
-
-        super.onResume();
-
-        /*
-         * Settings'dan qaytganda permission/sessionni
-         * qayta tekshiramiz.
-         */
-        if (webView != null) {
-            syncSessionAndTracking();
-        }
-    }
-
-    @Override
-    protected void onDestroy() {
-
-        /*
-         * Activity yopilganda WebView resurslarini tozalaymiz.
-         *
-         * LocationForegroundService esa alohida ishlashda
-         * davom etadi.
-         */
-        if (webView != null) {
-
-            webView.stopLoading();
-            webView.setWebChromeClient(null);
-            webView.setWebViewClient(null);
-            webView.destroy();
-
-            webView = null;
-        }
-
-        super.onDestroy();
-    }
-}
+       
