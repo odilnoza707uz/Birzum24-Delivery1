@@ -40,6 +40,7 @@ public class MainActivity extends AppCompatActivity {
     private static final int BACKGROUND_LOCATION_REQUEST = 1011;
 
     private WebView webView;
+
     private SharedPreferences prefs;
 
     @Override
@@ -47,7 +48,7 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
 
         /*
-         * WebView status bar ostiga kirib ketmasligi uchun.
+         * WebView status bar bilan ustma-ust tushmasin.
          */
         WindowCompat.setDecorFitsSystemWindows(
                 getWindow(),
@@ -63,42 +64,51 @@ public class MainActivity extends AppCompatActivity {
         controller.setAppearanceLightStatusBars(false);
         controller.setAppearanceLightNavigationBars(false);
 
+        /*
+         * Local storage.
+         */
         prefs = getSharedPreferences(
                 "birzum_delivery",
                 MODE_PRIVATE
         );
 
-        setContentView(R.layout.activity_main);
+        setContentView(
+                R.layout.activity_main
+        );
 
-        webView = findViewById(R.id.webView);
+        webView =
+                findViewById(
+                        R.id.webView
+                );
 
         setupWebView();
 
         /*
-         * Notification ruxsati.
+         * Android permissionlar.
          */
         requestNotificationPermission();
 
-        /*
-         * Location ruxsati.
-         */
         requestLocationPermission();
 
         /*
-         * Firebase FCM tokenini olish.
+         * FCM token olish.
          */
         getFcmToken();
 
+        /*
+         * Android back tugmasi.
+         */
         setupBackButton();
 
+        /*
+         * WebViewni ochish.
+         */
         webView.loadUrl(URL);
     }
 
-    /*
-     * ============================================================
-     * WEBVIEW
-     * ============================================================
-     */
+    // =========================================================
+    // WEBVIEW
+    // =========================================================
 
     private void setupWebView() {
 
@@ -106,11 +116,15 @@ public class MainActivity extends AppCompatActivity {
                 webView.getSettings();
 
         settings.setJavaScriptEnabled(true);
+
         settings.setDomStorageEnabled(true);
+
         settings.setDatabaseEnabled(true);
+
         settings.setGeolocationEnabled(true);
 
         settings.setAllowFileAccess(true);
+
         settings.setAllowContentAccess(true);
 
         settings.setJavaScriptCanOpenWindowsAutomatically(
@@ -124,18 +138,25 @@ public class MainActivity extends AppCompatActivity {
         );
 
         settings.setBuiltInZoomControls(false);
+
         settings.setDisplayZoomControls(false);
 
         settings.setLoadWithOverviewMode(false);
+
         settings.setUseWideViewPort(false);
 
+        /*
+         * Cookie/session.
+         */
         CookieManager cookieManager =
                 CookieManager.getInstance();
 
         cookieManager.setAcceptCookie(true);
 
-        if (Build.VERSION.SDK_INT >=
-                Build.VERSION_CODES.LOLLIPOP) {
+        if (
+                Build.VERSION.SDK_INT >=
+                        Build.VERSION_CODES.LOLLIPOP
+        ) {
 
             cookieManager.setAcceptThirdPartyCookies(
                     webView,
@@ -143,6 +164,9 @@ public class MainActivity extends AppCompatActivity {
             );
         }
 
+        /*
+         * WebViewClient.
+         */
         webView.setWebViewClient(
                 new WebViewClient() {
 
@@ -157,8 +181,15 @@ public class MainActivity extends AppCompatActivity {
                                 url
                         );
 
+                        /*
+                         * Sessionni tekshiramiz.
+                         */
                         syncSessionAndTracking();
 
+                        /*
+                         * WebView session biroz kechikib
+                         * tiklanishi mumkin.
+                         */
                         view.postDelayed(
                                 MainActivity.this::
                                         syncSessionAndTracking,
@@ -168,6 +199,9 @@ public class MainActivity extends AppCompatActivity {
                 }
         );
 
+        /*
+         * WebChromeClient.
+         */
         webView.setWebChromeClient(
                 new WebChromeClient() {
 
@@ -177,7 +211,9 @@ public class MainActivity extends AppCompatActivity {
                             GeolocationPermissions.Callback callback
                     ) {
 
-                        if (hasLocationPermission()) {
+                        if (
+                                hasLocationPermission()
+                        ) {
 
                             callback.invoke(
                                     origin,
@@ -207,10 +243,13 @@ public class MainActivity extends AppCompatActivity {
                             String[] resources =
                                     request.getResources();
 
-                            boolean camera = false;
+                            boolean camera =
+                                    false;
 
-                            for (String resource :
-                                    resources) {
+                            for (
+                                    String resource :
+                                    resources
+                            ) {
 
                                 if (
                                         PermissionRequest
@@ -219,6 +258,7 @@ public class MainActivity extends AppCompatActivity {
                                 ) {
 
                                     camera = true;
+
                                     break;
                                 }
                             }
@@ -226,13 +266,12 @@ public class MainActivity extends AppCompatActivity {
                             if (camera) {
 
                                 if (
-                                        ContextCompat
-                                                .checkSelfPermission(
-                                                        MainActivity.this,
-                                                        Manifest.permission.CAMERA
-                                                )
+                                        ContextCompat.checkSelfPermission(
+                                                MainActivity.this,
+                                                Manifest.permission.CAMERA
+                                        )
                                                 ==
-                                                PackageManager.PERMISSION_GRANTED
+                                        PackageManager.PERMISSION_GRANTED
                                 ) {
 
                                     request.grant(
@@ -256,86 +295,94 @@ public class MainActivity extends AppCompatActivity {
         );
     }
 
-    /*
-     * ============================================================
-     * FCM TOKEN
-     * ============================================================
-     */
+    // =========================================================
+    // FCM TOKEN
+    // =========================================================
 
     private void getFcmToken() {
 
         FirebaseMessaging
                 .getInstance()
                 .getToken()
-                .addOnCompleteListener(task -> {
+                .addOnCompleteListener(
+                        task -> {
 
-                    if (!task.isSuccessful()) {
+                            if (
+                                    !task.isSuccessful()
+                            ) {
 
-                        String error =
-                                task.getException() != null
-                                        ? task.getException()
-                                        .getMessage()
-                                        : "Noma'lum Firebase xatosi";
+                                String error;
 
-                        Toast.makeText(
-                                MainActivity.this,
-                                "FCM TOKEN XATO:\n" + error,
-                                Toast.LENGTH_LONG
-                        ).show();
+                                if (
+                                        task.getException()
+                                                != null
+                                ) {
 
-                        return;
-                    }
+                                    error =
+                                            task.getException()
+                                                    .getMessage();
 
-                    String token =
-                            task.getResult();
+                                } else {
 
-                    if (
-                            token == null
-                                    ||
-                            token.trim().isEmpty()
-                    ) {
+                                    error =
+                                            "Noma'lum Firebase xatosi";
+                                }
 
-                        Toast.makeText(
-                                MainActivity.this,
-                                "FCM TOKEN BO‘SH",
-                                Toast.LENGTH_LONG
-                        ).show();
+                                Toast.makeText(
+                                        MainActivity.this,
+                                        "FCM TOKEN XATO:\n"
+                                                + error,
+                                        Toast.LENGTH_LONG
+                                ).show();
 
-                        return;
-                    }
+                                return;
+                            }
 
-                    /*
-                     * Tokenni telefonda saqlaymiz.
-                     */
-                    prefs.edit()
-                            .putString(
-                                    "fcm_token",
-                                    token
-                            )
-                            .apply();
+                            String token =
+                                    task.getResult();
 
-                    /*
-                     * Diagnostika.
-                     */
-                    Toast.makeText(
-                            MainActivity.this,
-                            "FCM TOKEN OLINDI",
-                            Toast.LENGTH_SHORT
-                    ).show();
+                            if (
+                                    token == null ||
+                                    token.trim().isEmpty()
+                            ) {
 
-                    /*
-                     * Agar WebView login bo'lgan bo'lsa,
-                     * token serverga yuboriladi.
-                     */
-                    syncSessionAndTracking();
-                });
+                                Toast.makeText(
+                                        MainActivity.this,
+                                        "FCM TOKEN BO‘SH",
+                                        Toast.LENGTH_LONG
+                                ).show();
+
+                                return;
+                            }
+
+                            /*
+                             * Tokenni local saqlaymiz.
+                             */
+                            prefs.edit()
+                                    .putString(
+                                            "fcm_token",
+                                            token
+                                    )
+                                    .apply();
+
+                            Toast.makeText(
+                                    MainActivity.this,
+                                    "FCM TOKEN OLINDI",
+                                    Toast.LENGTH_SHORT
+                            ).show();
+
+                            /*
+                             * WebView session tayyor bo'lsa,
+                             * PHPga yuboramiz.
+                             */
+                            syncSessionAndTracking();
+                        }
+                );
     }
 
-    /*
-     * ============================================================
-     * SESSION + TRACKING + FCM SYNC
-     * ============================================================
-     */
+    // =========================================================
+    // SESSION + FCM + LOCATION
+    // =========================================================
 
     private void syncSessionAndTracking() {
 
@@ -350,26 +397,41 @@ public class MainActivity extends AppCompatActivity {
                 cookieManager.getCookie(URL);
 
         if (
-                cookie == null
-                        ||
+                cookie == null ||
                 cookie.isEmpty()
         ) {
+
             return;
         }
 
         String js =
                 "(async function(){"
                         + "try{"
-                        + "const r=await fetch('/c/api.php?a=state',{"
+
+                        + "const r=await fetch("
+                        + "'/c/api.php?a=state',"
+                        + "{"
                         + "method:'POST',"
                         + "credentials:'include',"
-                        + "headers:{'Content-Type':'application/json'}"
-                        + "});"
-                        + "const j=await r.json();"
-                        + "return JSON.stringify(j);"
-                        + "}catch(e){"
-                        + "return JSON.stringify({ok:false,error:String(e)});"
+                        + "headers:{"
+                        + "'Content-Type':'application/json'"
                         + "}"
+                        + "}"
+                        + ");"
+
+                        + "const j=await r.json();"
+
+                        + "return JSON.stringify(j);"
+
+                        + "}catch(e){"
+
+                        + "return JSON.stringify({"
+                        + "ok:false,"
+                        + "error:String(e)"
+                        + "});"
+
+                        + "}"
+
                         + "})()";
 
         webView.evaluateJavascript(
@@ -379,10 +441,10 @@ public class MainActivity extends AppCompatActivity {
                     try {
 
                         if (
-                                result == null
-                                        ||
+                                result == null ||
                                 result.equals("null")
                         ) {
+
                             return;
                         }
 
@@ -391,12 +453,11 @@ public class MainActivity extends AppCompatActivity {
 
                         /*
                          * evaluateJavascript
-                         * qaytargan JSON stringni
+                         * qaytargan qo'shtirnoqlarni
                          * ochamiz.
                          */
                         if (
-                                clean.startsWith("\"")
-                                        &&
+                                clean.startsWith("\"") &&
                                 clean.endsWith("\"")
                         ) {
 
@@ -431,12 +492,14 @@ public class MainActivity extends AppCompatActivity {
                                         clean
                                 );
 
-                        if (
-                                !data.optBoolean(
+                        boolean ok =
+                                data.optBoolean(
                                         "ok",
                                         false
-                                )
-                        ) {
+                                );
+
+                        if (!ok) {
+
                             return;
                         }
 
@@ -455,6 +518,7 @@ public class MainActivity extends AppCompatActivity {
                         if (
                                 csrf.isEmpty()
                         ) {
+
                             return;
                         }
 
@@ -474,10 +538,8 @@ public class MainActivity extends AppCompatActivity {
                                 .apply();
 
                         /*
-                         * Faqat kuryer ready bo'lganda:
-                         *
-                         * 1. FCM token serverga yuboriladi.
-                         * 2. Location foreground service ishga tushadi.
+                         * Faqat login tayyor bo'lganda
+                         * tokenni PHPga yuboramiz.
                          */
                         if (
                                 "ready".equals(stage)
@@ -487,6 +549,9 @@ public class MainActivity extends AppCompatActivity {
                                     csrf
                             );
 
+                            /*
+                             * Location service.
+                             */
                             if (
                                     hasLocationPermission()
                             ) {
@@ -495,22 +560,16 @@ public class MainActivity extends AppCompatActivity {
                             }
                         }
 
-                    } catch (Exception e) {
+                    } catch (Exception ignored) {
 
-                        /*
-                         * JSON xatosi ilovani
-                         * yiqitmasin.
-                         */
                     }
                 }
         );
     }
 
-    /*
-     * ============================================================
-     * FCM TOKEN -> PHP
-     * ============================================================
-     */
+    // =========================================================
+    // FCM TOKEN -> PHP
+    // =========================================================
 
     private void syncFcmTokenToServer(
             String csrf
@@ -523,16 +582,24 @@ public class MainActivity extends AppCompatActivity {
                 );
 
         if (
-                token == null
-                        ||
+                token == null ||
                 token.trim().isEmpty()
         ) {
+
+            Toast.makeText(
+                    this,
+                    "FCM token topilmadi",
+                    Toast.LENGTH_LONG
+            ).show();
 
             return;
         }
 
         try {
 
+            /*
+             * JSON body.
+             */
             JSONObject body =
                     new JSONObject();
 
@@ -545,10 +612,9 @@ public class MainActivity extends AppCompatActivity {
                     body.toString();
 
             /*
-             * Java string ichida JS uchun
-             * xavfsiz JSON.
+             * JavaScript uchun quote.
              */
-            String escaped =
+            String bodyEscaped =
                     JSONObject.quote(
                             bodyJson
                     );
@@ -558,51 +624,89 @@ public class MainActivity extends AppCompatActivity {
                             csrf
                     );
 
+            /*
+             * PHP APIga POST.
+             */
             String js =
                     "(async function(){"
                             + "try{"
-                            + "const r=await fetch('/c/api.php?a=fcm_token',{"
+
+                            + "const r=await fetch("
+                            + "'/c/api.php?a=fcm_token',"
+                            + "{"
+
                             + "method:'POST',"
+
                             + "credentials:'include',"
+
                             + "headers:{"
-                            + "'Content-Type':'application/json',"
+
+                            + "'Content-Type':"
+                            + "'application/json',"
+
                             + "'X-CSRF-Token':"
                             + csrfEscaped
+
                             + "},"
+
                             + "body:"
-                            + escaped
-                            + "});"
-                            + "const j=await r.json();"
-                            + "return JSON.stringify(j);"
-                            + "}catch(e){"
-                            + "return JSON.stringify({ok:false,error:String(e)});"
+                            + bodyEscaped
+
                             + "}"
+                            + ");"
+
+                            + "const text=await r.text();"
+
+                            + "return JSON.stringify({"
+
+                            + "http:r.status,"
+
+                            + "text:text"
+
+                            + "});"
+
+                            + "}catch(e){"
+
+                            + "return JSON.stringify({"
+
+                            + "error:String(e)"
+
+                            + "});"
+
+                            + "}"
+
                             + "})()";
 
             webView.evaluateJavascript(
                     js,
                     result -> {
 
-                        /*
-                         * Diagnostika:
-                         * server javobini ko'ramiz.
-                         */
-                        if (
-                                result == null
-                                        ||
-                                result.equals("null")
-                        ) {
-                            return;
-                        }
-
                         try {
+
+                            if (
+                                    result == null ||
+                                    result.equals("null")
+                            ) {
+
+                                Toast.makeText(
+                                        this,
+                                        "FCM server javobi yo‘q",
+                                        Toast.LENGTH_LONG
+                                ).show();
+
+                                return;
+                            }
 
                             String clean =
                                     result;
 
+                            /*
+                             * evaluateJavascript
+                             * stringini ochamiz.
+                             */
                             if (
                                     clean.startsWith("\"")
-                                            &&
+                                    &&
                                     clean.endsWith("\"")
                             ) {
 
@@ -620,6 +724,14 @@ public class MainActivity extends AppCompatActivity {
                                                     "\""
                                             )
                                             .replace(
+                                                    "\\n",
+                                                    ""
+                                            )
+                                            .replace(
+                                                    "\\/",
+                                                    "/"
+                                            )
+                                            .replace(
                                                     "\\\\",
                                                     "\\"
                                             );
@@ -629,55 +741,114 @@ public class MainActivity extends AppCompatActivity {
                                             clean
                                     );
 
+                            int http =
+                                    response.optInt(
+                                            "http",
+                                            0
+                                    );
+
+                            String text =
+                                    response.optString(
+                                            "text",
+                                            ""
+                                    );
+
+                            String error =
+                                    response.optString(
+                                            "error",
+                                            ""
+                                    );
+
+                            /*
+                             * JavaScript fetch xatosi.
+                             */
                             if (
-                                    response.optBoolean(
-                                            "ok",
-                                            false
-                                    )
+                                    !error.isEmpty()
                             ) {
 
-                                /*
-                                 * Token serverga yozildi.
-                                 */
-                                prefs.edit()
-                                        .putBoolean(
-                                                "fcm_synced",
-                                                true
-                                        )
-                                        .apply();
+                                Toast.makeText(
+                                        this,
+                                        "FCM API XATO:\n"
+                                                + error,
+                                        Toast.LENGTH_LONG
+                                ).show();
 
-                            } else {
-
-                                /*
-                                 * Server tokenni qabul qilmadi.
-                                 */
-                                prefs.edit()
-                                        .putBoolean(
-                                                "fcm_synced",
-                                                false
-                                        )
-                                        .apply();
+                                return;
                             }
 
-                        } catch (Exception ignored) {
+                            /*
+                             * PHP javobini ekranga chiqaramiz.
+                             */
+                            Toast.makeText(
+                                    this,
+                                    "FCM API HTTP "
+                                            + http
+                                            + "\n"
+                                            + text,
+                                    Toast.LENGTH_LONG
+                            ).show();
 
+                            /*
+                             * Agar PHP:
+                             * {"ok":true,"saved":1}
+                             * qaytarsa, token saqlandi.
+                             */
+                            try {
+
+                                JSONObject php =
+                                        new JSONObject(
+                                                text
+                                        );
+
+                                boolean saved =
+                                        php.optBoolean(
+                                                "ok",
+                                                false
+                                        );
+
+                                prefs.edit()
+                                        .putBoolean(
+                                                "fcm_synced",
+                                                saved
+                                        )
+                                        .apply();
+
+                            } catch (
+                                    Exception ignored
+                            ) {
+
+                            }
+
+                        } catch (
+                                Exception e
+                        ) {
+
+                            Toast.makeText(
+                                    this,
+                                    "FCM javobini o‘qishda xato:\n"
+                                            + e.getMessage(),
+                                    Toast.LENGTH_LONG
+                            ).show();
                         }
                     }
             );
 
-        } catch (Exception e) {
+        } catch (
+                Exception e
+        ) {
 
-            /*
-             * FCM xatosi ilovani yiqitmasin.
-             */
+            Toast.makeText(
+                    this,
+                    "FCM yuborishda xato:\n"
+                            + e.getMessage(),
+                    Toast.LENGTH_LONG
+            ).show();
         }
     }
 
-    /*
-     * ============================================================
-     * LOCATION
-     * ============================================================
-     */
+    // =========================================================
+    // LOCATION PERMISSION
+    // =========================================================
 
     private boolean hasLocationPermission() {
 
@@ -692,38 +863,35 @@ public class MainActivity extends AppCompatActivity {
                 ) == PackageManager.PERMISSION_GRANTED;
     }
 
-    private boolean hasFineLocationPermission() {
-
-        return ContextCompat.checkSelfPermission(
-                this,
-                Manifest.permission.ACCESS_FINE_LOCATION
-        ) == PackageManager.PERMISSION_GRANTED;
-    }
-
     private void requestLocationPermission() {
 
         if (
-                Build.VERSION.SDK_INT >=
-                        Build.VERSION_CODES.M
+                hasLocationPermission()
         ) {
 
-            if (!hasLocationPermission()) {
+            /*
+             * Android 10+ background location.
+             */
+            requestBackgroundLocation();
 
-                ActivityCompat.requestPermissions(
-                        this,
-                        new String[]{
-                                Manifest.permission
-                                        .ACCESS_FINE_LOCATION,
-                                Manifest.permission
-                                        .ACCESS_COARSE_LOCATION
-                        },
-                        LOCATION_REQUEST
-                );
-            }
+            return;
         }
+
+        ActivityCompat.requestPermissions(
+                this,
+                new String[]{
+                        Manifest.permission.ACCESS_FINE_LOCATION,
+                        Manifest.permission.ACCESS_COARSE_LOCATION
+                },
+                LOCATION_REQUEST
+        );
     }
 
-    private void requestBackgroundLocationPermission() {
+    // =========================================================
+    // BACKGROUND LOCATION
+    // =========================================================
+
+    private void requestBackgroundLocation() {
 
         if (
                 Build.VERSION.SDK_INT <
@@ -734,127 +902,88 @@ public class MainActivity extends AppCompatActivity {
         }
 
         if (
-                Build.VERSION.SDK_INT >=
-                        Build.VERSION_CODES.R
+                ContextCompat.checkSelfPermission(
+                        this,
+                        Manifest.permission.ACCESS_BACKGROUND_LOCATION
+                )
+                ==
+                PackageManager.PERMISSION_GRANTED
         ) {
 
-            new AlertDialog.Builder(this)
-                    .setTitle(
-                            "Fonda joylashuvga ruxsat"
-                    )
-                    .setMessage(
-                            "BirZum24 Delivery kuryer buyurtmasini yetkazayotgan paytda ilova yopiq yoki ekran o‘chiq bo‘lsa ham joylashuvni yuborishi kerak."
-                    )
-                    .setPositiveButton(
-                            "Sozlamalarni ochish",
-                            (dialog, which) -> {
-
-                                try {
-
-                                    Intent intent =
-                                            new Intent(
-                                                    Settings
-                                                            .ACTION_APPLICATION_DETAILS_SETTINGS
-                                            );
-
-                                    intent.setData(
-                                            Uri.parse(
-                                                    "package:"
-                                                            +
-                                                    getPackageName()
-                                            )
-                                    );
-
-                                    startActivity(
-                                            intent
-                                    );
-
-                                } catch (
-                                        Exception e
-                                ) {
-
-                                    Intent intent =
-                                            new Intent(
-                                                    Settings
-                                                            .ACTION_SETTINGS
-                                            );
-
-                                    startActivity(
-                                            intent
-                                    );
-                                }
-                            }
-                    )
-                    .setNegativeButton(
-                            "Keyinroq",
-                            null
-                    )
-                    .show();
-
-        } else {
-
-            if (
-                    ContextCompat.checkSelfPermission(
-                            this,
-                            Manifest.permission
-                                    .ACCESS_BACKGROUND_LOCATION
-                    )
-                    !=
-                    PackageManager.PERMISSION_GRANTED
-            ) {
-
-                ActivityCompat.requestPermissions(
-                        this,
-                        new String[]{
-                                Manifest.permission
-                                        .ACCESS_BACKGROUND_LOCATION
-                        },
-                        BACKGROUND_LOCATION_REQUEST
-                );
-            }
+            return;
         }
+
+        new AlertDialog.Builder(this)
+                .setTitle(
+                        "Doimiy joylashuv"
+                )
+                .setMessage(
+                        "BirZum24 kuryerlar uchun buyurtma vaqtida joylashuvingizni fonda ham yuborishi kerak. Keyingi oynada \"Har doim ruxsat berish\"ni tanlang."
+                )
+                .setPositiveButton(
+                        "Ruxsat berish",
+                        (dialog, which) -> {
+
+                            if (
+                                    Build.VERSION.SDK_INT >=
+                                            Build.VERSION_CODES.Q
+                            ) {
+
+                                ActivityCompat.requestPermissions(
+                                        this,
+                                        new String[]{
+                                                Manifest.permission.ACCESS_BACKGROUND_LOCATION
+                                        },
+                                        BACKGROUND_LOCATION_REQUEST
+                                );
+                            }
+                        }
+                )
+                .setNegativeButton(
+                        "Keyin",
+                        null
+                )
+                .show();
     }
 
-    /*
-     * ============================================================
-     * NOTIFICATION PERMISSION
-     * ============================================================
-     */
+    // =========================================================
+    // NOTIFICATION PERMISSION
+    // =========================================================
 
     private void requestNotificationPermission() {
 
         if (
-                Build.VERSION.SDK_INT >=
+                Build.VERSION.SDK_INT <
                         Build.VERSION_CODES.TIRAMISU
         ) {
 
-            if (
-                    ContextCompat.checkSelfPermission(
-                            this,
-                            Manifest.permission
-                                    .POST_NOTIFICATIONS
-                    )
-                    !=
-                    PackageManager.PERMISSION_GRANTED
-            ) {
-
-                ActivityCompat.requestPermissions(
-                        this,
-                        new String[]{
-                                Manifest.permission
-                                        .POST_NOTIFICATIONS
-                        },
-                        NOTIFICATION_REQUEST
-                );
-            }
+            return;
         }
+
+        if (
+                ContextCompat.checkSelfPermission(
+                        this,
+                        Manifest.permission.POST_NOTIFICATIONS
+                )
+                ==
+                PackageManager.PERMISSION_GRANTED
+        ) {
+
+            return;
+        }
+
+        ActivityCompat.requestPermissions(
+                this,
+                new String[]{
+                        Manifest.permission.POST_NOTIFICATIONS
+                },
+                NOTIFICATION_REQUEST
+        );
     }
 
-    /*
-     * ============================================================
-     * CAMERA
-     * ============================================================
-     */
+    // =========================================================
+    // CAMERA PERMISSION
+    // =========================================================
 
     private void requestCameraPermission() {
 
@@ -863,102 +992,69 @@ public class MainActivity extends AppCompatActivity {
                         this,
                         Manifest.permission.CAMERA
                 )
-                !=
+                ==
                 PackageManager.PERMISSION_GRANTED
         ) {
 
-            ActivityCompat.requestPermissions(
-                    this,
-                    new String[]{
-                            Manifest.permission.CAMERA
-                    },
-                    CAMERA_REQUEST
-            );
+            return;
         }
-    }
 
-    /*
-     * ============================================================
-     * LOCATION FOREGROUND SERVICE
-     * ============================================================
-     */
-
-    private void startLocationService() {
-
-        Intent intent =
-                new Intent(
-                        this,
-                        LocationForegroundService.class
-                );
-
-        if (
-                Build.VERSION.SDK_INT >=
-                        Build.VERSION_CODES.O
-        ) {
-
-            startForegroundService(
-                    intent
-            );
-
-        } else {
-
-            startService(
-                    intent
-            );
-        }
-    }
-
-    private void stopLocationService() {
-
-        Intent intent =
-                new Intent(
-                        this,
-                        LocationForegroundService.class
-                );
-
-        stopService(
-                intent
+        ActivityCompat.requestPermissions(
+                this,
+                new String[]{
+                        Manifest.permission.CAMERA
+                },
+                CAMERA_REQUEST
         );
     }
 
-    /*
-     * ============================================================
-     * BACK BUTTON
-     * ============================================================
-     */
+    // =========================================================
+    // LOCATION FOREGROUND SERVICE
+    // =========================================================
 
-    private void setupBackButton() {
+    private void startLocationService() {
 
-        getOnBackPressedDispatcher()
-                .addCallback(
+        try {
+
+            Intent intent =
+                    new Intent(
+                            this,
+                            LocationForegroundService.class
+                    );
+
+            if (
+                    Build.VERSION.SDK_INT >=
+                            Build.VERSION_CODES.O
+            ) {
+
+                ContextCompat.startForegroundService(
                         this,
-                        new OnBackPressedCallback(true) {
-
-                            @Override
-                            public void handleOnBackPressed() {
-
-                                if (
-                                        webView != null
-                                                &&
-                                        webView.canGoBack()
-                                ) {
-
-                                    webView.goBack();
-
-                                } else {
-
-                                    finish();
-                                }
-                            }
-                        }
+                        intent
                 );
+
+            } else {
+
+                startService(
+                        intent
+                );
+            }
+
+        } catch (
+                Exception e
+        ) {
+
+            Toast.makeText(
+                    this,
+                    "Location service xatosi:\n"
+                            + e.getMessage(),
+                    Toast.LENGTH_LONG
+            ).show();
+        }
     }
 
-    /*
-     * ============================================================
-     * PERMISSION RESULT
-     * ============================================================
-     */
+    // =========================================================
+    // PERMISSION RESULT
+    // =========================================================
 
     @Override
     public void onRequestPermissionsResult(
@@ -973,9 +1069,6 @@ public class MainActivity extends AppCompatActivity {
                 grantResults
         );
 
-        /*
-         * LOCATION
-         */
         if (
                 requestCode ==
                         LOCATION_REQUEST
@@ -985,13 +1078,7 @@ public class MainActivity extends AppCompatActivity {
                     hasLocationPermission()
             ) {
 
-                Toast.makeText(
-                        this,
-                        "Joylashuvga ruxsat berildi",
-                        Toast.LENGTH_SHORT
-                ).show();
-
-                requestBackgroundLocationPermission();
+                requestBackgroundLocation();
 
                 syncSessionAndTracking();
 
@@ -999,101 +1086,201 @@ public class MainActivity extends AppCompatActivity {
 
                 Toast.makeText(
                         this,
-                        "Joylashuvga ruxsat berilmasa kuryer tracking ishlamaydi.",
+                        "Joylashuv ruxsati berilmadi",
                         Toast.LENGTH_LONG
                 ).show();
             }
+
+            return;
         }
 
-        /*
-         * BACKGROUND LOCATION
-         */
         if (
                 requestCode ==
                         BACKGROUND_LOCATION_REQUEST
         ) {
 
             if (
-                    hasLocationPermission()
+                    Build.VERSION.SDK_INT >=
+                            Build.VERSION_CODES.Q
             ) {
 
-                syncSessionAndTracking();
+                if (
+                        ContextCompat.checkSelfPermission(
+                                this,
+                                Manifest.permission.ACCESS_BACKGROUND_LOCATION
+                        )
+                        ==
+                        PackageManager.PERMISSION_GRANTED
+                ) {
+
+                    Toast.makeText(
+                            this,
+                            "Fonda joylashuv ruxsati berildi",
+                            Toast.LENGTH_SHORT
+                    ).show();
+
+                } else {
+
+                    Toast.makeText(
+                            this,
+                            "Fonda joylashuv ruxsati berilmadi",
+                            Toast.LENGTH_LONG
+                    ).show();
+                }
             }
+
+            syncSessionAndTracking();
+
+            return;
         }
 
-        /*
-         * NOTIFICATION
-         */
         if (
                 requestCode ==
                         NOTIFICATION_REQUEST
         ) {
 
             if (
-                    Build.VERSION.SDK_INT <
+                    Build.VERSION.SDK_INT >=
                             Build.VERSION_CODES.TIRAMISU
-                            ||
-                    ContextCompat.checkSelfPermission(
-                            this,
-                            Manifest.permission
-                                    .POST_NOTIFICATIONS
-                    )
-                    ==
-                    PackageManager.PERMISSION_GRANTED
             ) {
 
-                Toast.makeText(
-                        this,
-                        "Bildirishnomalarga ruxsat berildi",
-                        Toast.LENGTH_SHORT
-                ).show();
+                if (
+                        ContextCompat.checkSelfPermission(
+                                this,
+                                Manifest.permission.POST_NOTIFICATIONS
+                        )
+                        ==
+                        PackageManager.PERMISSION_GRANTED
+                ) {
 
-            } else {
+                    Toast.makeText(
+                            this,
+                            "Bildirishnoma ruxsati berildi",
+                            Toast.LENGTH_SHORT
+                    ).show();
 
-                Toast.makeText(
-                        this,
-                        "Bildirishnoma ruxsati berilmadi.",
-                        Toast.LENGTH_SHORT
-                ).show();
+                } else {
+
+                    Toast.makeText(
+                            this,
+                            "Bildirishnoma ruxsati berilmadi",
+                            Toast.LENGTH_LONG
+                    ).show();
+                }
             }
+
+            return;
         }
 
-        /*
-         * CAMERA
-         */
         if (
                 requestCode ==
                         CAMERA_REQUEST
         ) {
 
             if (
-                    ContextCompat.checkSelfPermission(
-                            this,
-                            Manifest.permission.CAMERA
-                    )
-                    ==
+                    grantResults.length > 0
+                    &&
+                    grantResults[0]
+                            ==
                     PackageManager.PERMISSION_GRANTED
             ) {
 
                 Toast.makeText(
                         this,
-                        "Kameraga ruxsat berildi",
+                        "Kamera ruxsati berildi",
                         Toast.LENGTH_SHORT
                 ).show();
-
-                if (webView != null) {
-
-                    webView.reload();
-                }
 
             } else {
 
                 Toast.makeText(
                         this,
-                        "Kameraga ruxsat berilmadi.",
-                        Toast.LENGTH_SHORT
+                        "Kamera ruxsati berilmadi",
+                        Toast.LENGTH_LONG
                 ).show();
             }
         }
+    }
+
+    // =========================================================
+    // BACK BUTTON
+    // =========================================================
+
+    private void setupBackButton() {
+
+        getOnBackPressedDispatcher()
+                .addCallback(
+                        this,
+                        new OnBackPressedCallback(
+                                true
+                        ) {
+
+                            @Override
+                            public void handleOnBackPressed() {
+
+                                if (
+                                        webView != null
+                                        &&
+                                        webView.canGoBack()
+                                ) {
+
+                                    webView.goBack();
+
+                                } else {
+
+                                    finish();
+                                }
+                            }
+                        }
+                );
+    }
+
+    // =========================================================
+    // ACTIVITY RESUME
+    // =========================================================
+
+    @Override
+    protected void onResume() {
+
+        super.onResume();
+
+        /*
+         * Ilova qayta ochilganda sessionni
+         * qayta tekshiramiz.
+         */
+        if (webView != null) {
+
+            webView.postDelayed(
+                    this::syncSessionAndTracking,
+                    500
+            );
+        }
+    }
+
+    // =========================================================
+    // ACTIVITY DESTROY
+    // =========================================================
+
+    @Override
+    protected void onDestroy() {
+
+        if (webView != null) {
+
+            webView.stopLoading();
+
+            webView.setWebChromeClient(
+                    null
+            );
+
+            webView.setWebViewClient(
+                    null
+            );
+
+            webView.destroy();
+
+            webView = null;
+        }
+
+        super.onDestroy();
     }
 }
