@@ -6,6 +6,7 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
@@ -78,14 +79,26 @@ public class MainActivity extends AppCompatActivity {
 
         destroyed = false;
 
+        /*
+         * Android 15/16 edge-to-edge holatida
+         * WebView system barlar ostiga kirib ketmasligi
+         * uchun insetlarni o'zimiz boshqaramiz.
+         */
         WindowCompat.setDecorFitsSystemWindows(
                 getWindow(),
-                true
+                false
         );
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            getWindow().setStatusBarColor(Color.BLACK);
-            getWindow().setNavigationBarColor(Color.BLACK);
+        if (Build.VERSION.SDK_INT >=
+                Build.VERSION_CODES.LOLLIPOP) {
+
+            getWindow().setStatusBarColor(
+                    Color.BLACK
+            );
+
+            getWindow().setNavigationBarColor(
+                    Color.BLACK
+            );
         }
 
         prefs = getSharedPreferences(
@@ -93,9 +106,13 @@ public class MainActivity extends AppCompatActivity {
                 MODE_PRIVATE
         );
 
-        setContentView(R.layout.activity_main);
+        setContentView(
+                R.layout.activity_main
+        );
 
-        webView = findViewById(R.id.webView);
+        webView = findViewById(
+                R.id.webView
+        );
 
         setupSystemBarInsets();
 
@@ -115,7 +132,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     // =========================================================
-    // SYSTEM BAR / STATUS BAR
+    // SYSTEM BAR / STATUS BAR / NAVIGATION BAR
     // =========================================================
 
     private void setupSystemBarInsets() {
@@ -124,6 +141,18 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
 
+        /*
+         * Edge-to-edge yoqilgan.
+         *
+         * WebView ichidagi kontent:
+         *
+         * TOP    -> status bar
+         * BOTTOM -> navigation bar
+         * LEFT   -> system inset
+         * RIGHT  -> system inset
+         *
+         * ostida qolmasligi uchun padding beriladi.
+         */
         ViewCompat.setOnApplyWindowInsetsListener(
                 webView,
                 (view, insets) -> {
@@ -134,9 +163,9 @@ public class MainActivity extends AppCompatActivity {
                             );
 
                     view.setPadding(
-                            0,
+                            systemInsets.left,
                             systemInsets.top,
-                            0,
+                            systemInsets.right,
                             systemInsets.bottom
                     );
 
@@ -144,7 +173,9 @@ public class MainActivity extends AppCompatActivity {
                 }
         );
 
-        ViewCompat.requestApplyInsets(webView);
+        ViewCompat.requestApplyInsets(
+                webView
+        );
     }
 
     // =========================================================
@@ -186,6 +217,9 @@ public class MainActivity extends AppCompatActivity {
 
         settings.setUseWideViewPort(false);
 
+        /*
+         * Cookie.
+         */
         CookieManager cookieManager =
                 CookieManager.getInstance();
 
@@ -200,6 +234,9 @@ public class MainActivity extends AppCompatActivity {
             );
         }
 
+        /*
+         * WebView client.
+         */
         webView.setWebViewClient(
                 new WebViewClient() {
 
@@ -209,20 +246,25 @@ public class MainActivity extends AppCompatActivity {
                             WebResourceRequest request
                     ) {
 
-                        if (request == null ||
-                                request.getUrl() == null) {
-
+                        if (
+                                request == null
+                                        ||
+                                request.getUrl() == null
+                        ) {
                             return false;
                         }
 
                         String host =
-                                request.getUrl().getHost();
+                                request.getUrl()
+                                        .getHost();
 
-                        if (host != null &&
+                        if (
+                                host != null
+                                        &&
                                 host.equals(
                                         "birzum.asakaedu.uz"
-                                )) {
-
+                                )
+                        ) {
                             return false;
                         }
 
@@ -240,10 +282,19 @@ public class MainActivity extends AppCompatActivity {
                                 url
                         );
 
+                        /*
+                         * Cookie yozilishi uchun sync.
+                         */
                         CookieManager
                                 .getInstance()
                                 .flush();
 
+                        /*
+                         * Sayt yuklangandan keyin
+                         * session/token tekshiriladi.
+                         *
+                         * Ikkita tekshiruv qoldirilgan.
+                         */
                         handler.postDelayed(
                                 MainActivity.this
                                         ::syncSessionAndTracking,
@@ -259,6 +310,9 @@ public class MainActivity extends AppCompatActivity {
                 }
         );
 
+        /*
+         * Chrome client.
+         */
         webView.setWebChromeClient(
                 new WebChromeClient() {
 
@@ -298,14 +352,19 @@ public class MainActivity extends AppCompatActivity {
                             String[] resources =
                                     request.getResources();
 
-                            boolean camera = false;
+                            boolean camera =
+                                    false;
 
-                            for (String resource :
-                                    resources) {
+                            for (
+                                    String resource :
+                                    resources
+                            ) {
 
-                                if (PermissionRequest
-                                        .RESOURCE_VIDEO_CAPTURE
-                                        .equals(resource)) {
+                                if (
+                                        PermissionRequest
+                                                .RESOURCE_VIDEO_CAPTURE
+                                                .equals(resource)
+                                ) {
 
                                     camera = true;
 
@@ -366,13 +425,11 @@ public class MainActivity extends AppCompatActivity {
                                                         .getMessage()
                                                 : "Noma'lum Firebase xatosi";
 
-                                Toast.makeText(
-                                        MainActivity.this,
-                                        "FCM TOKEN XATO:\n"
-                                                + error,
-                                        Toast.LENGTH_LONG
-                                ).show();
-
+                                /*
+                                 * Token olishdagi xatoni
+                                 * foydalanuvchiga doimiy Toast qilib
+                                 * ko'rsatmaymiz.
+                                 */
                                 return;
                             }
 
@@ -380,18 +437,18 @@ public class MainActivity extends AppCompatActivity {
                                     task.getResult();
 
                             if (
-                                    token == null ||
+                                    token == null
+                                            ||
                                     token.trim().isEmpty()
                             ) {
-
-                                Toast.makeText(
-                                        MainActivity.this,
-                                        "FCM TOKEN BO‘SH",
-                                        Toast.LENGTH_LONG
-                                ).show();
-
                                 return;
                             }
+
+                            String oldToken =
+                                    prefs.getString(
+                                            "fcm_token",
+                                            ""
+                                    );
 
                             prefs.edit()
                                     .putString(
@@ -400,6 +457,28 @@ public class MainActivity extends AppCompatActivity {
                                     )
                                     .apply();
 
+                            /*
+                             * Token o'zgargan bo'lsa,
+                             * eski synced holatni bekor qilamiz.
+                             */
+                            if (!token.equals(oldToken)) {
+
+                                prefs.edit()
+                                        .remove(
+                                                "fcm_synced_token"
+                                        )
+                                        .putBoolean(
+                                                "fcm_synced",
+                                                false
+                                        )
+                                        .apply();
+                            }
+
+                            /*
+                             * Token olingan.
+                             * Sayt sessioni tayyor bo'lganda
+                             * serverga yuboriladi.
+                             */
                             syncSessionAndTracking();
                         }
                 );
@@ -425,6 +504,9 @@ public class MainActivity extends AppCompatActivity {
 
         sessionSyncRunning = true;
 
+        /*
+         * WebView cookie.
+         */
         CookieManager cookieManager =
                 CookieManager.getInstance();
 
@@ -434,7 +516,8 @@ public class MainActivity extends AppCompatActivity {
                 );
 
         if (
-                cookie == null ||
+                cookie == null
+                        ||
                 cookie.trim().isEmpty()
         ) {
 
@@ -445,12 +528,17 @@ public class MainActivity extends AppCompatActivity {
         }
 
         if (
-                cookie == null ||
+                cookie == null
+                        ||
                 cookie.trim().isEmpty()
         ) {
 
             sessionSyncRunning = false;
 
+            /*
+             * Sayt hali cookie bermagan bo'lishi mumkin.
+             * Keyin yana urinib ko'ramiz.
+             */
             handler.postDelayed(
                     this::syncSessionAndTracking,
                     2500
@@ -462,6 +550,11 @@ public class MainActivity extends AppCompatActivity {
         final String finalCookie =
                 cookie;
 
+        /*
+         * Native HTTP.
+         *
+         * WebView fetch ishlatilmaydi.
+         */
         new Thread(() -> {
 
             String responseText = "";
@@ -519,8 +612,10 @@ public class MainActivity extends AppCompatActivity {
                                 StandardCharsets.UTF_8
                         );
 
-                try (OutputStream output =
-                             connection.getOutputStream()) {
+                try (
+                        OutputStream output =
+                                connection.getOutputStream()
+                ) {
 
                     output.write(body);
 
@@ -532,8 +627,11 @@ public class MainActivity extends AppCompatActivity {
 
                 InputStream stream;
 
-                if (httpCode >= 200 &&
-                        httpCode < 400) {
+                if (
+                        httpCode >= 200
+                                &&
+                        httpCode < 400
+                ) {
 
                     stream =
                             connection.getInputStream();
@@ -579,25 +677,14 @@ public class MainActivity extends AppCompatActivity {
 
                 if (!finalError.isEmpty()) {
 
-                    Toast.makeText(
-                            MainActivity.this,
-                            "STATE XATO:\n"
-                                    + finalError,
-                            Toast.LENGTH_LONG
-                    ).show();
-
+                    /*
+                     * STATE xatolarini har safar Toast
+                     * qilib chiqarishni to'xtatamiz.
+                     */
                     return;
                 }
 
                 if (finalResponse.isEmpty()) {
-
-                    Toast.makeText(
-                            MainActivity.this,
-                            "STATE javobi bo‘sh. HTTP "
-                                    + finalHttpCode,
-                            Toast.LENGTH_LONG
-                    ).show();
-
                     return;
                 }
 
@@ -615,14 +702,6 @@ public class MainActivity extends AppCompatActivity {
                             );
 
                     if (!ok) {
-
-                        Toast.makeText(
-                                MainActivity.this,
-                                "SESSION OK = FALSE\n"
-                                        + finalResponse,
-                                Toast.LENGTH_LONG
-                        ).show();
-
                         return;
                     }
 
@@ -638,6 +717,9 @@ public class MainActivity extends AppCompatActivity {
                                     "login"
                             );
 
+                    /*
+                     * Session ma'lumotlarini saqlaymiz.
+                     */
                     prefs.edit()
                             .putString(
                                     "cookie",
@@ -653,6 +735,9 @@ public class MainActivity extends AppCompatActivity {
                             )
                             .apply();
 
+                    /*
+                     * Faqat kuryer tizimiga kirgan bo'lsa.
+                     */
                     if (
                             "ready".equals(
                                     stage
@@ -665,11 +750,28 @@ public class MainActivity extends AppCompatActivity {
                                         ""
                                 );
 
+                        String syncedToken =
+                                prefs.getString(
+                                        "fcm_synced_token",
+                                        ""
+                                );
+
+                        /*
+                         * Faqat hali serverga yuborilmagan
+                         * tokenni yuboramiz.
+                         */
                         if (
-                                token != null &&
-                                !token.trim().isEmpty() &&
-                                csrf != null &&
+                                token != null
+                                        &&
+                                !token.trim().isEmpty()
+                                        &&
+                                csrf != null
+                                        &&
                                 !csrf.trim().isEmpty()
+                                        &&
+                                !token.equals(
+                                        syncedToken
+                                )
                         ) {
 
                             syncFcmTokenToServer(
@@ -689,14 +791,10 @@ public class MainActivity extends AppCompatActivity {
 
                 } catch (Exception e) {
 
-                    Toast.makeText(
-                            MainActivity.this,
-                            "STATE JSON XATO:\n"
-                                    + e.getMessage()
-                                    + "\nHTTP "
-                                    + finalHttpCode,
-                            Toast.LENGTH_LONG
-                    ).show();
+                    /*
+                     * STATE JSON xatosini ham doimiy
+                     * Toast qilmaymiz.
+                     */
                 }
             });
 
@@ -714,23 +812,40 @@ public class MainActivity extends AppCompatActivity {
     ) {
 
         if (
-                cookie == null ||
+                cookie == null
+                        ||
                 cookie.trim().isEmpty()
         ) {
             return;
         }
 
         if (
-                csrf == null ||
+                csrf == null
+                        ||
                 csrf.trim().isEmpty()
         ) {
             return;
         }
 
         if (
-                token == null ||
+                token == null
+                        ||
                 token.trim().isEmpty()
         ) {
+            return;
+        }
+
+        /*
+         * Agar shu token aynan serverga yuborilgan bo'lsa,
+         * qayta yubormaymiz.
+         */
+        String syncedToken =
+                prefs.getString(
+                        "fcm_synced_token",
+                        ""
+                );
+
+        if (token.equals(syncedToken)) {
             return;
         }
 
@@ -805,8 +920,10 @@ public class MainActivity extends AppCompatActivity {
                         "BirZum24-Delivery-Android"
                 );
 
-                try (OutputStream output =
-                             connection.getOutputStream()) {
+                try (
+                        OutputStream output =
+                                connection.getOutputStream()
+                ) {
 
                     output.write(
                             bodyBytes
@@ -820,8 +937,11 @@ public class MainActivity extends AppCompatActivity {
 
                 InputStream stream;
 
-                if (httpCode >= 200 &&
-                        httpCode < 400) {
+                if (
+                        httpCode >= 200
+                                &&
+                        httpCode < 400
+                ) {
 
                     stream =
                             connection.getInputStream();
@@ -889,9 +1009,34 @@ public class MainActivity extends AppCompatActivity {
 
                 try {
 
+                    /*
+                     * Server to'g'ri JSON yuborsa:
+                     *
+                     * {"ok":true,"saved":1}
+                     *
+                     * yoki:
+                     *
+                     * {"ok":true,"saved":true}
+                     *
+                     * ishlaydi.
+                     *
+                     * Sizdagi hozirgi javobda:
+                     *
+                     * {"ok":true,'saved':1}
+                     *
+                     * bo'lsa, single quote ni ham
+                     * moslashtiramiz.
+                     */
+                    String normalizedResponse =
+                            finalResponse
+                                    .replace(
+                                            "'saved'",
+                                            "\"saved\""
+                                    );
+
                     JSONObject json =
                             new JSONObject(
-                                    finalResponse
+                                    normalizedResponse
                             );
 
                     boolean ok =
@@ -904,31 +1049,53 @@ public class MainActivity extends AppCompatActivity {
                             json.optBoolean(
                                     "saved",
                                     false
-                            );
+                            )
+                            ||
+                            json.optInt(
+                                    "saved",
+                                    0
+                            ) == 1;
 
                     if (
-                            ok &&
+                            ok
+                                    &&
                             saved
                     ) {
 
+                        /*
+                         * Aynan shu token serverga
+                         * muvaffaqiyatli saqlandi.
+                         */
                         prefs.edit()
                                 .putBoolean(
                                         "fcm_synced",
                                         true
                                 )
+                                .putString(
+                                        "fcm_synced_token",
+                                        token
+                                )
                                 .apply();
 
+                        /*
+                         * Endi Toastni qayta-qayta chiqarmaymiz.
+                         *
+                         * Faqat bir marta qisqa xabar.
+                         */
                         Toast.makeText(
                                 MainActivity.this,
-                                "✅ FCM BAZAGA SAQLANDI",
-                                Toast.LENGTH_LONG
+                                "✅ FCM bazaga saqlandi",
+                                Toast.LENGTH_SHORT
                         ).show();
 
                     } else {
 
+                        /*
+                         * Haqiqatan xato bo'lsa ko'rsatamiz.
+                         */
                         Toast.makeText(
                                 MainActivity.this,
-                                "❌ FCM BAZAGA SAQLANMADI\n"
+                                "❌ FCM bazaga saqlanmadi\n"
                                         + finalResponse,
                                 Toast.LENGTH_LONG
                         ).show();
@@ -1039,10 +1206,11 @@ public class MainActivity extends AppCompatActivity {
         if (
                 ContextCompat.checkSelfPermission(
                         this,
-                        Manifest.permission.ACCESS_BACKGROUND_LOCATION
+                        Manifest.permission
+                                .ACCESS_BACKGROUND_LOCATION
                 )
-                ==
-                PackageManager.PERMISSION_GRANTED
+                        ==
+                        PackageManager.PERMISSION_GRANTED
         ) {
             return;
         }
@@ -1063,13 +1231,15 @@ public class MainActivity extends AppCompatActivity {
                                             Build.VERSION_CODES.Q
                             ) {
 
-                                ActivityCompat.requestPermissions(
-                                        this,
-                                        new String[]{
-                                                Manifest.permission.ACCESS_BACKGROUND_LOCATION
-                                        },
-                                        BACKGROUND_LOCATION_REQUEST
-                                );
+                                ActivityCompat
+                                        .requestPermissions(
+                                                this,
+                                                new String[]{
+                                                        Manifest.permission
+                                                                .ACCESS_BACKGROUND_LOCATION
+                                                },
+                                                BACKGROUND_LOCATION_REQUEST
+                                        );
                             }
                         }
                 )
@@ -1098,8 +1268,8 @@ public class MainActivity extends AppCompatActivity {
                         this,
                         Manifest.permission.POST_NOTIFICATIONS
                 )
-                ==
-                PackageManager.PERMISSION_GRANTED
+                        ==
+                        PackageManager.PERMISSION_GRANTED
         ) {
             return;
         }
@@ -1124,8 +1294,8 @@ public class MainActivity extends AppCompatActivity {
                         this,
                         Manifest.permission.CAMERA
                 )
-                ==
-                PackageManager.PERMISSION_GRANTED
+                        ==
+                        PackageManager.PERMISSION_GRANTED
         ) {
             return;
         }
@@ -1249,10 +1419,11 @@ public class MainActivity extends AppCompatActivity {
                 if (
                         ContextCompat.checkSelfPermission(
                                 this,
-                                Manifest.permission.POST_NOTIFICATIONS
+                                Manifest.permission
+                                        .POST_NOTIFICATIONS
                         )
-                        ==
-                        PackageManager.PERMISSION_GRANTED
+                                ==
+                                PackageManager.PERMISSION_GRANTED
                 ) {
 
                     Toast.makeText(
@@ -1281,7 +1452,7 @@ public class MainActivity extends AppCompatActivity {
 
             if (
                     grantResults.length > 0
-                    &&
+                            &&
                     grantResults[0]
                             ==
                             PackageManager.PERMISSION_GRANTED
@@ -1322,7 +1493,7 @@ public class MainActivity extends AppCompatActivity {
 
                                 if (
                                         webView != null
-                                        &&
+                                                &&
                                         webView.canGoBack()
                                 ) {
 
