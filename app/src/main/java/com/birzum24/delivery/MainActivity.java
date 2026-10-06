@@ -5,14 +5,19 @@ import android.app.AlertDialog;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
+import android.graphics.Color;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.provider.Settings;
+import android.view.View;
 import android.webkit.CookieManager;
 import android.webkit.GeolocationPermissions;
 import android.webkit.PermissionRequest;
 import android.webkit.WebChromeClient;
+import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
@@ -22,17 +27,35 @@ import androidx.activity.OnBackPressedCallback;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
+import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowCompat;
-import androidx.core.view.WindowInsetsControllerCompat;
+import androidx.core.view.WindowInsetsCompat;
 
 import com.google.firebase.messaging.FirebaseMessaging;
 
 import org.json.JSONObject;
 
+import java.io.BufferedReader;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
+
 public class MainActivity extends AppCompatActivity {
 
+    private static final String BASE_URL =
+            "https://birzum.asakaedu.uz";
+
     private static final String URL =
-            "https://birzum.asakaedu.uz/c/";
+            BASE_URL + "/c/";
+
+    private static final String STATE_URL =
+            BASE_URL + "/c/api.php?a=state";
+
+    private static final String FCM_URL =
+            BASE_URL + "/c/api.php?a=fcm_token";
 
     private static final int LOCATION_REQUEST = 1001;
     private static final int NOTIFICATION_REQUEST = 1002;
@@ -43,50 +66,93 @@ public class MainActivity extends AppCompatActivity {
 
     private SharedPreferences prefs;
 
+    private final Handler handler =
+            new Handler(Looper.getMainLooper());
+
+    private boolean sessionSyncRunning = false;
+
+    private boolean destroyed = false;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+
         super.onCreate(savedInstanceState);
 
-        // Status bar bilan WebView ustma-ust tushmasin
+        destroyed = false;
+
+        /*
+         * Edge-to-edge ni o'chiramiz.
+         * WebView status bar ostiga kirib ketmasligi uchun
+         * pastdagi WindowInsets ham qo'llanadi.
+         */
         WindowCompat.setDecorFitsSystemWindows(
                 getWindow(),
                 true
         );
 
-        WindowInsetsControllerCompat controller =
-                WindowCompat.getInsetsController(
-                        getWindow(),
-                        getWindow().getDecorView()
-                );
-
-        controller.setAppearanceLightStatusBars(false);
-        controller.setAppearanceLightNavigationBars(false);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            getWindow().setStatusBarColor(Color.BLACK);
+            getWindow().setNavigationBarColor(Color.BLACK);
+        }
 
         prefs = getSharedPreferences(
                 "birzum_delivery",
                 MODE_PRIVATE
         );
 
-        setContentView(
-                R.layout.activity_main
-        );
+        setContentView(R.layout.activity_main);
 
-        webView =
-                findViewById(
-                        R.id.webView
-                );
+        webView = findViewById(R.id.webView);
+
+        setupSystemBarInsets();
 
         setupWebView();
+
+        setupBackButton();
 
         requestNotificationPermission();
 
         requestLocationPermission();
 
+        requestCameraPermission();
+
         getFcmToken();
 
-        setupBackButton();
-
         webView.loadUrl(URL);
+    }
+
+    // =========================================================
+    // SYSTEM BAR / STATUS BAR
+    // =========================================================
+
+    private void setupSystemBarInsets() {
+
+        if (webView == null) {
+            return;
+        }
+
+        ViewCompat.setOnApplyWindowInsetsListener(
+                webView,
+                (view, insets) -> {
+
+                    WindowInsetsCompat.Type.InsetsType type =
+                            WindowInsetsCompat.Type.systemBars();
+
+                    androidx.core.graphics.Insets systemInsets =
+                            insets.getInsets(type);
+
+                    view.setPadding(
+                            0,
+                            systemInsets.top,
+                            0,
+                            systemInsets.bottom
+                    );
+
+                    return insets;
+                }
+        );
+
+        ViewCompat.requestApplyInsets(webView);
     }
 
     // =========================================================
@@ -99,11 +165,15 @@ public class MainActivity extends AppCompatActivity {
                 webView.getSettings();
 
         settings.setJavaScriptEnabled(true);
+
         settings.setDomStorageEnabled(true);
+
         settings.setDatabaseEnabled(true);
+
         settings.setGeolocationEnabled(true);
 
         settings.setAllowFileAccess(true);
+
         settings.setAllowContentAccess(true);
 
         settings.setJavaScriptCanOpenWindowsAutomatically(
@@ -117,21 +187,23 @@ public class MainActivity extends AppCompatActivity {
         );
 
         settings.setBuiltInZoomControls(false);
+
         settings.setDisplayZoomControls(false);
 
         settings.setLoadWithOverviewMode(false);
+
         settings.setUseWideViewPort(false);
 
-        // Cookie
+        /*
+         * Cookie.
+         */
         CookieManager cookieManager =
                 CookieManager.getInstance();
 
         cookieManager.setAcceptCookie(true);
 
-        if (
-                Build.VERSION.SDK_INT >=
-                        Build.VERSION_CODES.LOLLIPOP
-        ) {
+        if (Build.VERSION.SDK_INT >=
+                Build.VERSION_CODES.LOLLIPOP) {
 
             cookieManager.setAcceptThirdPartyCookies(
                     webView,
@@ -139,9 +211,37 @@ public class MainActivity extends AppCompatActivity {
             );
         }
 
-        // WebView client
+        /*
+         * WebView client.
+         */
         webView.setWebViewClient(
                 new WebViewClient() {
+
+                    @Override
+                    public boolean shouldOverrideUrlLoading(
+                            WebView view,
+                            WebResourceRequest request
+                    ) {
+
+                        if (request == null ||
+                                request.getUrl() == null) {
+
+                            return false;
+                        }
+
+                        String host =
+                                request.getUrl().getHost();
+
+                        if (host != null &&
+                                host.equals(
+                                        "birzum.asakaedu.uz"
+                                )) {
+
+                            return false;
+                        }
+
+                        return false;
+                    }
 
                     @Override
                     public void onPageFinished(
@@ -154,33 +254,35 @@ public class MainActivity extends AppCompatActivity {
                                 url
                         );
 
-                        Toast.makeText(
-                                MainActivity.this,
-                                "SAYT YUKLANDI",
-                                Toast.LENGTH_SHORT
-                        ).show();
+                        /*
+                         * Cookie yozilishi uchun sync.
+                         */
+                        CookieManager
+                                .getInstance()
+                                .flush();
 
                         /*
                          * Sayt yuklangandan keyin
-                         * sessionni tekshiramiz.
+                         * session/token tekshiriladi.
                          */
-                        view.postDelayed(
-                                () -> syncSessionAndTracking(),
-                                1000
+                        handler.postDelayed(
+                                MainActivity.this
+                                        ::syncSessionAndTracking,
+                                1200
                         );
 
-                        /*
-                         * Yana bir marta tekshiramiz.
-                         */
-                        view.postDelayed(
-                                () -> syncSessionAndTracking(),
-                                4000
+                        handler.postDelayed(
+                                MainActivity.this
+                                        ::syncSessionAndTracking,
+                                4500
                         );
                     }
                 }
         );
 
-        // WebChromeClient
+        /*
+         * Chrome client.
+         */
         webView.setWebChromeClient(
                 new WebChromeClient() {
 
@@ -190,9 +292,7 @@ public class MainActivity extends AppCompatActivity {
                             GeolocationPermissions.Callback callback
                     ) {
 
-                        if (
-                                hasLocationPermission()
-                        ) {
+                        if (hasLocationPermission()) {
 
                             callback.invoke(
                                     origin,
@@ -225,47 +325,44 @@ public class MainActivity extends AppCompatActivity {
                             boolean camera =
                                     false;
 
-                            for (
-                                    String resource :
-                                    resources
-                            ) {
+                            for (String resource :
+                                    resources) {
 
-                                if (
-                                        PermissionRequest
-                                                .RESOURCE_VIDEO_CAPTURE
-                                                .equals(resource)
-                                ) {
+                                if (PermissionRequest
+                                        .RESOURCE_VIDEO_CAPTURE
+                                        .equals(resource)) {
 
                                     camera = true;
                                     break;
                                 }
                             }
 
-                            if (camera) {
-
-                                if (
-                                        ContextCompat.checkSelfPermission(
-                                                MainActivity.this,
-                                                Manifest.permission.CAMERA
-                                        )
-                                        ==
-                                        PackageManager.PERMISSION_GRANTED
-                                ) {
-
-                                    request.grant(
-                                            resources
-                                    );
-
-                                } else {
-
-                                    requestCameraPermission();
-                                }
-
-                            } else {
+                            if (!camera) {
 
                                 request.grant(
                                         resources
                                 );
+
+                                return;
+                            }
+
+                            if (
+                                    ContextCompat
+                                            .checkSelfPermission(
+                                                    MainActivity.this,
+                                                    Manifest.permission.CAMERA
+                                            )
+                                            ==
+                                            PackageManager.PERMISSION_GRANTED
+                            ) {
+
+                                request.grant(
+                                        resources
+                                );
+
+                            } else {
+
+                                requestCameraPermission();
                             }
                         });
                     }
@@ -279,26 +376,18 @@ public class MainActivity extends AppCompatActivity {
 
     private void getFcmToken() {
 
-        Toast.makeText(
-                this,
-                "FCM TOKEN OLISH...",
-                Toast.LENGTH_SHORT
-        ).show();
-
         FirebaseMessaging
                 .getInstance()
                 .getToken()
                 .addOnCompleteListener(
                         task -> {
 
-                            if (
-                                    !task.isSuccessful()
-                            ) {
+                            if (!task.isSuccessful()) {
 
                                 String error =
                                         task.getException() != null
                                                 ? task.getException()
-                                                .getMessage()
+                                                        .getMessage()
                                                 : "Noma'lum Firebase xatosi";
 
                                 Toast.makeText(
@@ -335,623 +424,618 @@ public class MainActivity extends AppCompatActivity {
                                     )
                                     .apply();
 
-                            Toast.makeText(
-                                    MainActivity.this,
-                                    "FCM TOKEN OLINDI",
-                                    Toast.LENGTH_SHORT
-                            ).show();
-
                             /*
-                             * Token olindi.
-                             * Endi session tekshiramiz.
+                             * Token olingan.
+                             * Sayt sessioni tayyor bo'lganda
+                             * serverga yuboriladi.
                              */
-                            Toast.makeText(
-                                    MainActivity.this,
-                                    "SESSION TEKSHIRILADI",
-                                    Toast.LENGTH_SHORT
-                            ).show();
-
                             syncSessionAndTracking();
                         }
                 );
     }
 
     // =========================================================
-    // SESSION
+    // SESSION + FCM + LOCATION
     // =========================================================
 
     private void syncSessionAndTracking() {
 
-        Toast.makeText(
-                this,
-                "STATE TEKSHIRILMOQDA...",
-                Toast.LENGTH_SHORT
-        ).show();
-
-        if (webView == null) {
-
-            Toast.makeText(
-                    this,
-                    "WEBVIEW NULL",
-                    Toast.LENGTH_LONG
-            ).show();
-
+        if (destroyed) {
             return;
         }
 
+        if (sessionSyncRunning) {
+            return;
+        }
+
+        if (webView == null) {
+            return;
+        }
+
+        sessionSyncRunning = true;
+
+        /*
+         * WebView cookie.
+         */
         CookieManager cookieManager =
                 CookieManager.getInstance();
 
         String cookie =
-                cookieManager.getCookie(URL);
+                cookieManager.getCookie(
+                        BASE_URL
+                );
 
         if (
                 cookie == null ||
-                cookie.isEmpty()
+                cookie.trim().isEmpty()
         ) {
 
-            Toast.makeText(
-                    this,
-                    "COOKIE YO‘Q",
-                    Toast.LENGTH_LONG
-            ).show();
+            cookie =
+                    cookieManager.getCookie(
+                            URL
+                    );
+        }
+
+        if (
+                cookie == null ||
+                cookie.trim().isEmpty()
+        ) {
+
+            sessionSyncRunning = false;
+
+            /*
+             * Sayt hali cookie bermagan bo'lishi mumkin.
+             * Keyin yana urinib ko'ramiz.
+             */
+            handler.postDelayed(
+                    this::syncSessionAndTracking,
+                    2500
+            );
 
             return;
         }
 
-        Toast.makeText(
-                this,
-                "COOKIE BOR",
-                Toast.LENGTH_SHORT
-        ).show();
+        final String finalCookie =
+                cookie;
 
-        String js =
-                "(async function(){"
-                        + "try{"
+        /*
+         * Native HTTP.
+         *
+         * WebView fetch ishlatilmaydi.
+         */
+        new Thread(() -> {
 
-                        + "const r=await fetch("
-                        + "'/c/api.php?a=state',"
-                        + "{"
-                        + "method:'POST',"
-                        + "credentials:'include',"
-                        + "headers:{"
-                        + "'Content-Type':'application/json'"
-                        + "}"
-                        + "}"
-                        + ");"
+            String responseText = "";
 
-                        + "const text=await r.text();"
+            int httpCode = 0;
 
-                        + "return JSON.stringify({"
-                        + "http:r.status,"
-                        + "text:text"
-                        + "});"
+            String error = "";
 
-                        + "}catch(e){"
+            try {
 
-                        + "return JSON.stringify({"
-                        + "error:String(e)"
-                        + "});"
+                HttpURLConnection connection =
+                        (HttpURLConnection)
+                                new URL(
+                                        STATE_URL
+                                ).openConnection();
 
-                        + "}"
+                connection.setRequestMethod(
+                        "POST"
+                );
 
-                        + "})()";
+                connection.setConnectTimeout(
+                        15000
+                );
 
-        webView.evaluateJavascript(
-                js,
-                result -> {
+                connection.setReadTimeout(
+                        15000
+                );
 
-                    try {
+                connection.setDoOutput(
+                        true
+                );
 
-                        if (
-                                result == null ||
-                                result.equals("null")
-                        ) {
+                connection.setRequestProperty(
+                        "Cookie",
+                        finalCookie
+                );
 
-                            Toast.makeText(
-                                    this,
-                                    "STATE JAVOBI YO‘Q",
-                                    Toast.LENGTH_LONG
-                            ).show();
+                connection.setRequestProperty(
+                        "Content-Type",
+                        "application/json; charset=UTF-8"
+                );
 
-                            return;
-                        }
+                connection.setRequestProperty(
+                        "Accept",
+                        "application/json"
+                );
 
-                        String clean =
-                                result;
+                connection.setRequestProperty(
+                        "User-Agent",
+                        "BirZum24-Delivery-Android"
+                );
 
-                        if (
-                                clean.startsWith("\"")
-                                &&
-                                clean.endsWith("\"")
-                        ) {
+                byte[] body =
+                        "{}".getBytes(
+                                StandardCharsets.UTF_8
+                        );
 
-                            clean =
-                                    clean.substring(
-                                            1,
-                                            clean.length() - 1
-                                    );
-                        }
+                try (OutputStream output =
+                             connection.getOutputStream()) {
 
-                        clean =
-                                clean
-                                        .replace(
-                                                "\\\"",
-                                                "\""
-                                        )
-                                        .replace(
-                                                "\\n",
-                                                ""
-                                        )
-                                        .replace(
-                                                "\\/",
-                                                "/"
-                                        )
-                                        .replace(
-                                                "\\\\",
-                                                "\\"
-                                        );
+                    output.write(body);
+                    output.flush();
+                }
 
-                        JSONObject response =
-                                new JSONObject(
-                                        clean
-                                );
+                httpCode =
+                        connection.getResponseCode();
 
-                        int http =
-                                response.optInt(
-                                        "http",
-                                        0
-                                );
+                InputStream stream;
 
-                        String text =
-                                response.optString(
-                                        "text",
-                                        ""
-                                );
+                if (httpCode >= 200 &&
+                        httpCode < 400) {
 
-                        String error =
-                                response.optString(
-                                        "error",
-                                        ""
-                                );
+                    stream =
+                            connection.getInputStream();
 
-                        if (
-                                !error.isEmpty()
-                        ) {
+                } else {
 
-                            Toast.makeText(
-                                    this,
-                                    "STATE XATO:\n"
-                                            + error,
-                                    Toast.LENGTH_LONG
-                            ).show();
+                    stream =
+                            connection.getErrorStream();
+                }
 
-                            return;
-                        }
+                if (stream != null) {
 
-                        Toast.makeText(
-                                this,
-                                "STATE HTTP "
-                                        + http,
-                                Toast.LENGTH_SHORT
-                        ).show();
+                    responseText =
+                            readStream(stream);
+                }
 
-                        if (
-                                text.isEmpty()
-                        ) {
+                connection.disconnect();
 
-                            Toast.makeText(
-                                    this,
-                                    "STATE TEXT BO‘SH",
-                                    Toast.LENGTH_LONG
-                            ).show();
+            } catch (Exception e) {
 
-                            return;
-                        }
+                error =
+                        e.getClass().getSimpleName()
+                                + ": "
+                                + e.getMessage();
+            }
 
-                        JSONObject data =
-                                new JSONObject(
-                                        text
-                                );
+            final int finalHttpCode =
+                    httpCode;
 
-                        boolean ok =
-                                data.optBoolean(
-                                        "ok",
-                                        false
-                                );
+            final String finalResponse =
+                    responseText;
 
-                        if (!ok) {
+            final String finalError =
+                    error;
 
-                            Toast.makeText(
-                                    this,
-                                    "STATE OK = FALSE\n"
-                                            + text,
-                                    Toast.LENGTH_LONG
-                            ).show();
+            runOnUiThread(() -> {
 
-                            return;
-                        }
+                sessionSyncRunning = false;
 
-                        String csrf =
-                                data.optString(
-                                        "csrf",
-                                        ""
-                                );
+                if (destroyed) {
+                    return;
+                }
 
-                        String stage =
-                                data.optString(
-                                        "stage",
-                                        "login"
-                                );
+                if (!finalError.isEmpty()) {
 
-                        Toast.makeText(
-                                this,
-                                "STAGE = "
-                                        + stage,
-                                Toast.LENGTH_LONG
-                        ).show();
+                    /*
+                     * Debug uchun faqat Toast.
+                     */
+                    Toast.makeText(
+                            MainActivity.this,
+                            "STATE XATO:\n"
+                                    + finalError,
+                            Toast.LENGTH_LONG
+                    ).show();
 
-                        if (
-                                csrf.isEmpty()
-                        ) {
+                    return;
+                }
 
-                            Toast.makeText(
-                                    this,
-                                    "CSRF BO‘SH",
-                                    Toast.LENGTH_LONG
-                            ).show();
+                if (finalResponse.isEmpty()) {
 
-                            return;
-                        }
+                    Toast.makeText(
+                            MainActivity.this,
+                            "STATE javobi bo‘sh. HTTP "
+                                    + finalHttpCode,
+                            Toast.LENGTH_LONG
+                    ).show();
 
-                        prefs.edit()
-                                .putString(
-                                        "cookie",
-                                        cookie
-                                )
-                                .putString(
-                                        "csrf",
-                                        csrf
-                                )
-                                .putString(
-                                        "stage",
-                                        stage
-                                )
-                                .apply();
+                    return;
+                }
 
-                        if (
-                                "ready".equals(stage)
-                        ) {
+                try {
 
-                            Toast.makeText(
-                                    this,
-                                    "READY! TOKEN YUBORILADI",
-                                    Toast.LENGTH_LONG
-                            ).show();
-
-                            syncFcmTokenToServer(
-                                    csrf
+                    JSONObject data =
+                            new JSONObject(
+                                    finalResponse
                             );
 
-                            if (
-                                    hasLocationPermission()
-                            ) {
+                    boolean ok =
+                            data.optBoolean(
+                                    "ok",
+                                    false
+                            );
 
-                                startLocationService();
-                            }
-
-                        } else {
-
-                            Toast.makeText(
-                                    this,
-                                    "READY EMAS: "
-                                            + stage,
-                                    Toast.LENGTH_LONG
-                            ).show();
-                        }
-
-                    } catch (
-                            Exception e
-                    ) {
+                    if (!ok) {
 
                         Toast.makeText(
-                                this,
-                                "STATE PARSE XATO:\n"
-                                        + e.getMessage(),
+                                MainActivity.this,
+                                "SESSION OK = FALSE\n"
+                                        + finalResponse,
                                 Toast.LENGTH_LONG
                         ).show();
+
+                        return;
                     }
+
+                    String csrf =
+                            data.optString(
+                                    "csrf",
+                                    ""
+                            );
+
+                    String stage =
+                            data.optString(
+                                    "stage",
+                                    "login"
+                            );
+
+                    /*
+                     * Session ma'lumotlarini saqlaymiz.
+                     */
+                    prefs.edit()
+                            .putString(
+                                    "cookie",
+                                    finalCookie
+                            )
+                            .putString(
+                                    "csrf",
+                                    csrf
+                            )
+                            .putString(
+                                    "stage",
+                                    stage
+                            )
+                            .apply();
+
+                    /*
+                     * Faqat kuryer tizimiga kirgan bo'lsa.
+                     */
+                    if (
+                            "ready".equals(
+                                    stage
+                            )
+                    ) {
+
+                        String token =
+                                prefs.getString(
+                                        "fcm_token",
+                                        ""
+                                );
+
+                        if (
+                                token != null &&
+                                !token.trim().isEmpty() &&
+                                csrf != null &&
+                                !csrf.trim().isEmpty()
+                        ) {
+
+                            syncFcmTokenToServer(
+                                    finalCookie,
+                                    csrf,
+                                    token
+                            );
+                        }
+
+                        if (
+                                hasLocationPermission()
+                        ) {
+
+                            startLocationService();
+                        }
+                    }
+
+                } catch (Exception e) {
+
+                    Toast.makeText(
+                            MainActivity.this,
+                            "STATE JSON XATO:\n"
+                                    + e.getMessage()
+                                    + "\nHTTP "
+                                    + finalHttpCode,
+                            Toast.LENGTH_LONG
+                    ).show();
                 }
-        );
+            });
+
+        }).start();
     }
 
     // =========================================================
-    // FCM TOKEN -> SERVER
+    // FCM TOKEN -> PHP
     // =========================================================
 
     private void syncFcmTokenToServer(
-            String csrf
+            String cookie,
+            String csrf,
+            String token
     ) {
 
-        Toast.makeText(
-                this,
-                "FCM SERVERGA YUBORILMOQDA...",
-                Toast.LENGTH_LONG
-        ).show();
+        if (
+                cookie == null ||
+                cookie.trim().isEmpty()
+        ) {
+            return;
+        }
 
-        String token =
-                prefs.getString(
-                        "fcm_token",
-                        ""
-                );
+        if (
+                csrf == null ||
+                csrf.trim().isEmpty()
+        ) {
+            return;
+        }
 
         if (
                 token == null ||
                 token.trim().isEmpty()
         ) {
-
-            Toast.makeText(
-                    this,
-                    "SERVERGA YUBORISHDA TOKEN YO‘Q",
-                    Toast.LENGTH_LONG
-            ).show();
-
             return;
         }
 
-        try {
+        new Thread(() -> {
 
-            JSONObject body =
-                    new JSONObject();
+            String responseText = "";
 
-            body.put(
-                    "token",
-                    token
-            );
+            int httpCode = 0;
 
-            String bodyJson =
-                    body.toString();
+            String error = "";
 
-            String bodyEscaped =
-                    JSONObject.quote(
-                            bodyJson
+            try {
+
+                JSONObject body =
+                        new JSONObject();
+
+                body.put(
+                        "token",
+                        token
+                );
+
+                byte[] bodyBytes =
+                        body.toString()
+                                .getBytes(
+                                        StandardCharsets.UTF_8
+                                );
+
+                HttpURLConnection connection =
+                        (HttpURLConnection)
+                                new URL(
+                                        FCM_URL
+                                ).openConnection();
+
+                connection.setRequestMethod(
+                        "POST"
+                );
+
+                connection.setConnectTimeout(
+                        15000
+                );
+
+                connection.setReadTimeout(
+                        15000
+                );
+
+                connection.setDoOutput(
+                        true
+                );
+
+                connection.setRequestProperty(
+                        "Cookie",
+                        cookie
+                );
+
+                connection.setRequestProperty(
+                        "X-CSRF-Token",
+                        csrf
+                );
+
+                connection.setRequestProperty(
+                        "Content-Type",
+                        "application/json; charset=UTF-8"
+                );
+
+                connection.setRequestProperty(
+                        "Accept",
+                        "application/json"
+                );
+
+                connection.setRequestProperty(
+                        "User-Agent",
+                        "BirZum24-Delivery-Android"
+                );
+
+                try (OutputStream output =
+                             connection.getOutputStream()) {
+
+                    output.write(
+                            bodyBytes
                     );
 
-            String csrfEscaped =
-                    JSONObject.quote(
-                            csrf
-                    );
+                    output.flush();
+                }
 
-            String js =
-                    "(async function(){"
-                            + "try{"
+                httpCode =
+                        connection.getResponseCode();
 
-                            + "const r=await fetch("
-                            + "'/c/api.php?a=fcm_token',"
-                            + "{"
+                InputStream stream;
 
-                            + "method:'POST',"
+                if (httpCode >= 200 &&
+                        httpCode < 400) {
 
-                            + "credentials:'include',"
+                    stream =
+                            connection.getInputStream();
 
-                            + "headers:{"
+                } else {
 
-                            + "'Content-Type':"
-                            + "'application/json',"
+                    stream =
+                            connection.getErrorStream();
+                }
 
-                            + "'X-CSRF-Token':"
-                            + csrfEscaped
+                if (stream != null) {
 
-                            + "},"
+                    responseText =
+                            readStream(stream);
+                }
 
-                            + "body:"
-                            + bodyEscaped
+                connection.disconnect();
 
-                            + "}"
-                            + ");"
+            } catch (Exception e) {
 
-                            + "const text=await r.text();"
+                error =
+                        e.getClass().getSimpleName()
+                                + ": "
+                                + e.getMessage();
+            }
 
-                            + "return JSON.stringify({"
+            final int finalHttpCode =
+                    httpCode;
 
-                            + "http:r.status,"
-                            + "text:text"
+            final String finalResponse =
+                    responseText;
 
-                            + "});"
+            final String finalError =
+                    error;
 
-                            + "}catch(e){"
+            runOnUiThread(() -> {
 
-                            + "return JSON.stringify({"
+                if (destroyed) {
+                    return;
+                }
 
-                            + "error:String(e)"
+                if (!finalError.isEmpty()) {
 
-                            + "});"
+                    Toast.makeText(
+                            MainActivity.this,
+                            "FCM SERVER XATO:\n"
+                                    + finalError,
+                            Toast.LENGTH_LONG
+                    ).show();
 
-                            + "}"
+                    return;
+                }
 
-                            + "})()";
+                if (finalResponse.isEmpty()) {
 
-            webView.evaluateJavascript(
-                    js,
-                    result -> {
+                    Toast.makeText(
+                            MainActivity.this,
+                            "FCM server javobi bo‘sh.\nHTTP "
+                                    + finalHttpCode,
+                            Toast.LENGTH_LONG
+                    ).show();
 
-                        try {
+                    return;
+                }
 
-                            if (
-                                    result == null ||
-                                    result.equals("null")
-                            ) {
+                try {
 
-                                Toast.makeText(
-                                        this,
-                                        "FCM API JAVOBI YO‘Q",
-                                        Toast.LENGTH_LONG
-                                ).show();
+                    JSONObject json =
+                            new JSONObject(
+                                    finalResponse
+                            );
 
-                                return;
-                            }
+                    boolean ok =
+                            json.optBoolean(
+                                    "ok",
+                                    false
+                            );
 
-                            String clean =
-                                    result;
+                    boolean saved =
+                            json.optBoolean(
+                                    "saved",
+                                    false
+                            );
 
-                            if (
-                                    clean.startsWith("\"")
-                                    &&
-                                    clean.endsWith("\"")
-                            ) {
+                    if (
+                            ok &&
+                            saved
+                    ) {
 
-                                clean =
-                                        clean.substring(
-                                                1,
-                                                clean.length() - 1
-                                        );
-                            }
+                        prefs.edit()
+                                .putBoolean(
+                                        "fcm_synced",
+                                        true
+                                )
+                                .apply();
 
-                            clean =
-                                    clean
-                                            .replace(
-                                                    "\\\"",
-                                                    "\""
-                                            )
-                                            .replace(
-                                                    "\\n",
-                                                    ""
-                                            )
-                                            .replace(
-                                                    "\\/",
-                                                    "/"
-                                            )
-                                            .replace(
-                                                    "\\\\",
-                                                    "\\"
-                                            );
+                        Toast.makeText(
+                                MainActivity.this,
+                                "✅ FCM BAZAGA SAQLANDI",
+                                Toast.LENGTH_LONG
+                        ).show();
 
-                            JSONObject response =
-                                    new JSONObject(
-                                            clean
-                                    );
+                    } else {
 
-                            int http =
-                                    response.optInt(
-                                            "http",
-                                            0
-                                    );
-
-                            String text =
-                                    response.optString(
-                                            "text",
-                                            ""
-                                    );
-
-                            String error =
-                                    response.optString(
-                                            "error",
-                                            ""
-                                    );
-
-                            if (
-                                    !error.isEmpty()
-                            ) {
-
-                                Toast.makeText(
-                                        this,
-                                        "FCM API XATO:\n"
-                                                + error,
-                                        Toast.LENGTH_LONG
-                                ).show();
-
-                                return;
-                            }
-
-                            Toast.makeText(
-                                    this,
-                                    "FCM API HTTP "
-                                            + http
-                                            + "\n"
-                                            + text,
-                                    Toast.LENGTH_LONG
-                            ).show();
-
-                            try {
-
-                                JSONObject php =
-                                        new JSONObject(
-                                                text
-                                        );
-
-                                boolean saved =
-                                        php.optBoolean(
-                                                "saved",
-                                                false
-                                        );
-
-                                boolean ok =
-                                        php.optBoolean(
-                                                "ok",
-                                                false
-                                        );
-
-                                if (
-                                        ok &&
-                                        saved
-                                ) {
-
-                                    Toast.makeText(
-                                            this,
-                                            "✅ FCM BAZAGA SAQLANDI",
-                                            Toast.LENGTH_LONG
-                                    ).show();
-
-                                    prefs.edit()
-                                            .putBoolean(
-                                                    "fcm_synced",
-                                                    true
-                                            )
-                                            .apply();
-
-                                } else {
-
-                                    Toast.makeText(
-                                            this,
-                                            "❌ FCM BAZAGA SAQLANMADI",
-                                            Toast.LENGTH_LONG
-                                    ).show();
-                                }
-
-                            } catch (
-                                    Exception ignored
-                            ) {
-                            }
-
-                        } catch (
-                                Exception e
-                        ) {
-
-                            Toast.makeText(
-                                    this,
-                                    "FCM JAVOB XATO:\n"
-                                            + e.getMessage(),
-                                    Toast.LENGTH_LONG
-                            ).show();
-                        }
+                        Toast.makeText(
+                                MainActivity.this,
+                                "❌ FCM BAZAGA SAQLANMADI\n"
+                                        + finalResponse,
+                                Toast.LENGTH_LONG
+                        ).show();
                     }
-            );
 
-        } catch (
-                Exception e
-        ) {
+                } catch (Exception e) {
 
-            Toast.makeText(
-                    this,
-                    "FCM YUBORISH XATO:\n"
-                            + e.getMessage(),
-                    Toast.LENGTH_LONG
-            ).show();
-        }
+                    Toast.makeText(
+                            MainActivity.this,
+                            "FCM JSON XATO:\n"
+                                    + e.getMessage()
+                                    + "\n"
+                                    + finalResponse,
+                            Toast.LENGTH_LONG
+                    ).show();
+                }
+            });
+
+        }).start();
     }
 
     // =========================================================
-    // LOCATION
+    // READ HTTP STREAM
+    // =========================================================
+
+    private String readStream(
+            InputStream stream
+    ) throws Exception {
+
+        StringBuilder result =
+                new StringBuilder();
+
+        try (
+                BufferedReader reader =
+                        new BufferedReader(
+                                new InputStreamReader(
+                                        stream,
+                                        StandardCharsets.UTF_8
+                                )
+                        )
+        ) {
+
+            String line;
+
+            while (
+                    (line = reader.readLine())
+                            != null
+            ) {
+
+                result.append(line);
+            }
+        }
+
+        return result.toString();
+    }
+
+    // =========================================================
+    // LOCATION PERMISSION
     // =========================================================
 
     private boolean hasLocationPermission() {
@@ -971,9 +1055,7 @@ public class MainActivity extends AppCompatActivity {
 
     private void requestLocationPermission() {
 
-        if (
-                hasLocationPermission()
-        ) {
+        if (hasLocationPermission()) {
 
             requestBackgroundLocation();
 
@@ -1000,7 +1082,6 @@ public class MainActivity extends AppCompatActivity {
                 Build.VERSION.SDK_INT <
                         Build.VERSION_CODES.Q
         ) {
-
             return;
         }
 
@@ -1012,7 +1093,6 @@ public class MainActivity extends AppCompatActivity {
                 ==
                 PackageManager.PERMISSION_GRANTED
         ) {
-
             return;
         }
 
@@ -1059,7 +1139,6 @@ public class MainActivity extends AppCompatActivity {
                 Build.VERSION.SDK_INT <
                         Build.VERSION_CODES.TIRAMISU
         ) {
-
             return;
         }
 
@@ -1071,7 +1150,6 @@ public class MainActivity extends AppCompatActivity {
                 ==
                 PackageManager.PERMISSION_GRANTED
         ) {
-
             return;
         }
 
@@ -1098,7 +1176,6 @@ public class MainActivity extends AppCompatActivity {
                 ==
                 PackageManager.PERMISSION_GRANTED
         ) {
-
             return;
         }
 
@@ -1112,7 +1189,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     // =========================================================
-    // LOCATION SERVICE
+    // LOCATION FOREGROUND SERVICE
     // =========================================================
 
     private void startLocationService() {
@@ -1142,9 +1219,7 @@ public class MainActivity extends AppCompatActivity {
                 );
             }
 
-        } catch (
-                Exception e
-        ) {
+        } catch (Exception e) {
 
             Toast.makeText(
                     this,
@@ -1177,9 +1252,7 @@ public class MainActivity extends AppCompatActivity {
                         LOCATION_REQUEST
         ) {
 
-            if (
-                    hasLocationPermission()
-            ) {
+            if (hasLocationPermission()) {
 
                 requestBackgroundLocation();
 
@@ -1201,6 +1274,11 @@ public class MainActivity extends AppCompatActivity {
                 requestCode ==
                         BACKGROUND_LOCATION_REQUEST
         ) {
+
+            if (hasLocationPermission()) {
+
+                startLocationService();
+            }
 
             syncSessionAndTracking();
 
@@ -1255,7 +1333,7 @@ public class MainActivity extends AppCompatActivity {
                     &&
                     grantResults[0]
                             ==
-                    PackageManager.PERMISSION_GRANTED
+                            PackageManager.PERMISSION_GRANTED
             ) {
 
                 Toast.makeText(
@@ -1276,7 +1354,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     // =========================================================
-    // BACK
+    // BACK BUTTON
     // =========================================================
 
     private void setupBackButton() {
@@ -1317,9 +1395,11 @@ public class MainActivity extends AppCompatActivity {
 
         super.onResume();
 
+        destroyed = false;
+
         if (webView != null) {
 
-            webView.postDelayed(
+            handler.postDelayed(
                     this::syncSessionAndTracking,
                     1000
             );
@@ -1332,6 +1412,12 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     protected void onDestroy() {
+
+        destroyed = true;
+
+        handler.removeCallbacksAndMessages(
+                null
+        );
 
         if (webView != null) {
 
