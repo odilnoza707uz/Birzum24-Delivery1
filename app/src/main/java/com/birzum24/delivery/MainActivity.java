@@ -657,6 +657,90 @@ public class MainActivity extends AppCompatActivity {
 
         super.onRequestPermissionsResult(
                 requestCode,
-       
+                permissions,
+                grantResults
+        );
+
+        if (requestCode == LOCATION_REQUEST) {
+
+            if (hasLocationPermission()) {
+
+                Toast.makeText(
+                        this,
+                        "Joylashuvga ruxsat berildi",
+                        Toast.LENGTH_SHORT
+                ).show();
+
+                requestBackgroundLocationPermission();
+
+                syncSessionAndTracking();
+
+            } else {
+
+                Toast.makeText(
+                        this,
+                        "Joylashuvga ruxsat berilmasa kuryer tracking ishlamaydi.",
+                        Toast.LENGTH_LONG
+                ).show();
             }
         }
+
+        if (requestCode == BACKGROUND_LOCATION_REQUEST) {
+
+            if (hasLocationPermission()) {
+
+                syncSessionAndTracking();
+            }
+        }
+
+        if (requestCode == NOTIFICATION_REQUEST) {
+
+            if (ContextCompat.checkSelfPermission(
+                    this,
+                    Manifest.permission.POST_NOTIFICATIONS
+            ) == PackageManager.PERMISSION_GRANTED) {
+
+                Toast.makeText(
+                        this,
+                        "Bildirishnomalarga ruxsat berildi",
+                        Toast.LENGTH_SHORT
+                ).show();
+
+            } else {
+
+                Toast.makeText(
+                        this,
+                        "Bildirishnoma ruxsati berilmadi.",
+                        Toast.LENGTH_SHORT
+                ).show();
+            }
+        }
+
+        if (requestCode == CAMERA_REQUEST) {
+
+            if (ContextCompat.checkSelfPermission(
+                    this,
+                    Manifest.permission.CAMERA
+            ) == PackageManager.PERMISSION_GRANTED) {
+
+                Toast.makeText(
+                        this,
+                        "Kameraga ruxsat berildi",
+                        Toast.LENGTH_SHORT
+                ).show();
+
+                if (webView != null) {
+                    webView.reload();
+                }
+
+            } else {
+
+                Toast.makeText(
+                        this,
+                        "Kameraga ruxsat berilmadi.",
+                        Toast.LENGTH_SHORT
+                ).show();
+            }
+        }
+    }
+}
