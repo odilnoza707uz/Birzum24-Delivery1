@@ -47,9 +47,7 @@ public class MainActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        /*
-         * WebView status bar bilan ustma-ust tushmasin.
-         */
+        // Status bar bilan WebView ustma-ust tushmasin
         WindowCompat.setDecorFitsSystemWindows(
                 getWindow(),
                 true
@@ -64,9 +62,6 @@ public class MainActivity extends AppCompatActivity {
         controller.setAppearanceLightStatusBars(false);
         controller.setAppearanceLightNavigationBars(false);
 
-        /*
-         * Local storage.
-         */
         prefs = getSharedPreferences(
                 "birzum_delivery",
                 MODE_PRIVATE
@@ -83,26 +78,14 @@ public class MainActivity extends AppCompatActivity {
 
         setupWebView();
 
-        /*
-         * Android permissionlar.
-         */
         requestNotificationPermission();
 
         requestLocationPermission();
 
-        /*
-         * FCM token olish.
-         */
         getFcmToken();
 
-        /*
-         * Android back tugmasi.
-         */
         setupBackButton();
 
-        /*
-         * WebViewni ochish.
-         */
         webView.loadUrl(URL);
     }
 
@@ -116,15 +99,11 @@ public class MainActivity extends AppCompatActivity {
                 webView.getSettings();
 
         settings.setJavaScriptEnabled(true);
-
         settings.setDomStorageEnabled(true);
-
         settings.setDatabaseEnabled(true);
-
         settings.setGeolocationEnabled(true);
 
         settings.setAllowFileAccess(true);
-
         settings.setAllowContentAccess(true);
 
         settings.setJavaScriptCanOpenWindowsAutomatically(
@@ -138,16 +117,12 @@ public class MainActivity extends AppCompatActivity {
         );
 
         settings.setBuiltInZoomControls(false);
-
         settings.setDisplayZoomControls(false);
 
         settings.setLoadWithOverviewMode(false);
-
         settings.setUseWideViewPort(false);
 
-        /*
-         * Cookie/session.
-         */
+        // Cookie
         CookieManager cookieManager =
                 CookieManager.getInstance();
 
@@ -164,9 +139,7 @@ public class MainActivity extends AppCompatActivity {
             );
         }
 
-        /*
-         * WebViewClient.
-         */
+        // WebView client
         webView.setWebViewClient(
                 new WebViewClient() {
 
@@ -181,27 +154,33 @@ public class MainActivity extends AppCompatActivity {
                                 url
                         );
 
-                        /*
-                         * Sessionni tekshiramiz.
-                         */
-                        syncSessionAndTracking();
+                        Toast.makeText(
+                                MainActivity.this,
+                                "SAYT YUKLANDI",
+                                Toast.LENGTH_SHORT
+                        ).show();
 
                         /*
-                         * WebView session biroz kechikib
-                         * tiklanishi mumkin.
+                         * Sayt yuklangandan keyin
+                         * sessionni tekshiramiz.
                          */
                         view.postDelayed(
-                                MainActivity.this::
-                                        syncSessionAndTracking,
-                                3000
+                                () -> syncSessionAndTracking(),
+                                1000
+                        );
+
+                        /*
+                         * Yana bir marta tekshiramiz.
+                         */
+                        view.postDelayed(
+                                () -> syncSessionAndTracking(),
+                                4000
                         );
                     }
                 }
         );
 
-        /*
-         * WebChromeClient.
-         */
+        // WebChromeClient
         webView.setWebChromeClient(
                 new WebChromeClient() {
 
@@ -258,7 +237,6 @@ public class MainActivity extends AppCompatActivity {
                                 ) {
 
                                     camera = true;
-
                                     break;
                                 }
                             }
@@ -270,7 +248,7 @@ public class MainActivity extends AppCompatActivity {
                                                 MainActivity.this,
                                                 Manifest.permission.CAMERA
                                         )
-                                                ==
+                                        ==
                                         PackageManager.PERMISSION_GRANTED
                                 ) {
 
@@ -301,6 +279,12 @@ public class MainActivity extends AppCompatActivity {
 
     private void getFcmToken() {
 
+        Toast.makeText(
+                this,
+                "FCM TOKEN OLISH...",
+                Toast.LENGTH_SHORT
+        ).show();
+
         FirebaseMessaging
                 .getInstance()
                 .getToken()
@@ -311,22 +295,11 @@ public class MainActivity extends AppCompatActivity {
                                     !task.isSuccessful()
                             ) {
 
-                                String error;
-
-                                if (
-                                        task.getException()
-                                                != null
-                                ) {
-
-                                    error =
-                                            task.getException()
-                                                    .getMessage();
-
-                                } else {
-
-                                    error =
-                                            "Noma'lum Firebase xatosi";
-                                }
+                                String error =
+                                        task.getException() != null
+                                                ? task.getException()
+                                                .getMessage()
+                                                : "Noma'lum Firebase xatosi";
 
                                 Toast.makeText(
                                         MainActivity.this,
@@ -355,9 +328,6 @@ public class MainActivity extends AppCompatActivity {
                                 return;
                             }
 
-                            /*
-                             * Tokenni local saqlaymiz.
-                             */
                             prefs.edit()
                                     .putString(
                                             "fcm_token",
@@ -372,21 +342,40 @@ public class MainActivity extends AppCompatActivity {
                             ).show();
 
                             /*
-                             * WebView session tayyor bo'lsa,
-                             * PHPga yuboramiz.
+                             * Token olindi.
+                             * Endi session tekshiramiz.
                              */
+                            Toast.makeText(
+                                    MainActivity.this,
+                                    "SESSION TEKSHIRILADI",
+                                    Toast.LENGTH_SHORT
+                            ).show();
+
                             syncSessionAndTracking();
                         }
                 );
     }
 
     // =========================================================
-    // SESSION + FCM + LOCATION
+    // SESSION
     // =========================================================
 
     private void syncSessionAndTracking() {
 
+        Toast.makeText(
+                this,
+                "STATE TEKSHIRILMOQDA...",
+                Toast.LENGTH_SHORT
+        ).show();
+
         if (webView == null) {
+
+            Toast.makeText(
+                    this,
+                    "WEBVIEW NULL",
+                    Toast.LENGTH_LONG
+            ).show();
+
             return;
         }
 
@@ -401,8 +390,20 @@ public class MainActivity extends AppCompatActivity {
                 cookie.isEmpty()
         ) {
 
+            Toast.makeText(
+                    this,
+                    "COOKIE YO‘Q",
+                    Toast.LENGTH_LONG
+            ).show();
+
             return;
         }
+
+        Toast.makeText(
+                this,
+                "COOKIE BOR",
+                Toast.LENGTH_SHORT
+        ).show();
 
         String js =
                 "(async function(){"
@@ -419,14 +420,16 @@ public class MainActivity extends AppCompatActivity {
                         + "}"
                         + ");"
 
-                        + "const j=await r.json();"
+                        + "const text=await r.text();"
 
-                        + "return JSON.stringify(j);"
+                        + "return JSON.stringify({"
+                        + "http:r.status,"
+                        + "text:text"
+                        + "});"
 
                         + "}catch(e){"
 
                         + "return JSON.stringify({"
-                        + "ok:false,"
                         + "error:String(e)"
                         + "});"
 
@@ -445,19 +448,21 @@ public class MainActivity extends AppCompatActivity {
                                 result.equals("null")
                         ) {
 
+                            Toast.makeText(
+                                    this,
+                                    "STATE JAVOBI YO‘Q",
+                                    Toast.LENGTH_LONG
+                            ).show();
+
                             return;
                         }
 
                         String clean =
                                 result;
 
-                        /*
-                         * evaluateJavascript
-                         * qaytargan qo'shtirnoqlarni
-                         * ochamiz.
-                         */
                         if (
-                                clean.startsWith("\"") &&
+                                clean.startsWith("\"")
+                                &&
                                 clean.endsWith("\"")
                         ) {
 
@@ -487,9 +492,66 @@ public class MainActivity extends AppCompatActivity {
                                                 "\\"
                                         );
 
-                        JSONObject data =
+                        JSONObject response =
                                 new JSONObject(
                                         clean
+                                );
+
+                        int http =
+                                response.optInt(
+                                        "http",
+                                        0
+                                );
+
+                        String text =
+                                response.optString(
+                                        "text",
+                                        ""
+                                );
+
+                        String error =
+                                response.optString(
+                                        "error",
+                                        ""
+                                );
+
+                        if (
+                                !error.isEmpty()
+                        ) {
+
+                            Toast.makeText(
+                                    this,
+                                    "STATE XATO:\n"
+                                            + error,
+                                    Toast.LENGTH_LONG
+                            ).show();
+
+                            return;
+                        }
+
+                        Toast.makeText(
+                                this,
+                                "STATE HTTP "
+                                        + http,
+                                Toast.LENGTH_SHORT
+                        ).show();
+
+                        if (
+                                text.isEmpty()
+                        ) {
+
+                            Toast.makeText(
+                                    this,
+                                    "STATE TEXT BO‘SH",
+                                    Toast.LENGTH_LONG
+                            ).show();
+
+                            return;
+                        }
+
+                        JSONObject data =
+                                new JSONObject(
+                                        text
                                 );
 
                         boolean ok =
@@ -499,6 +561,13 @@ public class MainActivity extends AppCompatActivity {
                                 );
 
                         if (!ok) {
+
+                            Toast.makeText(
+                                    this,
+                                    "STATE OK = FALSE\n"
+                                            + text,
+                                    Toast.LENGTH_LONG
+                            ).show();
 
                             return;
                         }
@@ -515,9 +584,22 @@ public class MainActivity extends AppCompatActivity {
                                         "login"
                                 );
 
+                        Toast.makeText(
+                                this,
+                                "STAGE = "
+                                        + stage,
+                                Toast.LENGTH_LONG
+                        ).show();
+
                         if (
                                 csrf.isEmpty()
                         ) {
+
+                            Toast.makeText(
+                                    this,
+                                    "CSRF BO‘SH",
+                                    Toast.LENGTH_LONG
+                            ).show();
 
                             return;
                         }
@@ -537,43 +619,65 @@ public class MainActivity extends AppCompatActivity {
                                 )
                                 .apply();
 
-                        /*
-                         * Faqat login tayyor bo'lganda
-                         * tokenni PHPga yuboramiz.
-                         */
                         if (
                                 "ready".equals(stage)
                         ) {
+
+                            Toast.makeText(
+                                    this,
+                                    "READY! TOKEN YUBORILADI",
+                                    Toast.LENGTH_LONG
+                            ).show();
 
                             syncFcmTokenToServer(
                                     csrf
                             );
 
-                            /*
-                             * Location service.
-                             */
                             if (
                                     hasLocationPermission()
                             ) {
 
                                 startLocationService();
                             }
+
+                        } else {
+
+                            Toast.makeText(
+                                    this,
+                                    "READY EMAS: "
+                                            + stage,
+                                    Toast.LENGTH_LONG
+                            ).show();
                         }
 
-                    } catch (Exception ignored) {
+                    } catch (
+                            Exception e
+                    ) {
 
+                        Toast.makeText(
+                                this,
+                                "STATE PARSE XATO:\n"
+                                        + e.getMessage(),
+                                Toast.LENGTH_LONG
+                        ).show();
                     }
                 }
         );
     }
 
     // =========================================================
-    // FCM TOKEN -> PHP
+    // FCM TOKEN -> SERVER
     // =========================================================
 
     private void syncFcmTokenToServer(
             String csrf
     ) {
+
+        Toast.makeText(
+                this,
+                "FCM SERVERGA YUBORILMOQDA...",
+                Toast.LENGTH_LONG
+        ).show();
 
         String token =
                 prefs.getString(
@@ -588,7 +692,7 @@ public class MainActivity extends AppCompatActivity {
 
             Toast.makeText(
                     this,
-                    "FCM token topilmadi",
+                    "SERVERGA YUBORISHDA TOKEN YO‘Q",
                     Toast.LENGTH_LONG
             ).show();
 
@@ -597,9 +701,6 @@ public class MainActivity extends AppCompatActivity {
 
         try {
 
-            /*
-             * JSON body.
-             */
             JSONObject body =
                     new JSONObject();
 
@@ -611,9 +712,6 @@ public class MainActivity extends AppCompatActivity {
             String bodyJson =
                     body.toString();
 
-            /*
-             * JavaScript uchun quote.
-             */
             String bodyEscaped =
                     JSONObject.quote(
                             bodyJson
@@ -624,9 +722,6 @@ public class MainActivity extends AppCompatActivity {
                             csrf
                     );
 
-            /*
-             * PHP APIga POST.
-             */
             String js =
                     "(async function(){"
                             + "try{"
@@ -660,7 +755,6 @@ public class MainActivity extends AppCompatActivity {
                             + "return JSON.stringify({"
 
                             + "http:r.status,"
-
                             + "text:text"
 
                             + "});"
@@ -690,7 +784,7 @@ public class MainActivity extends AppCompatActivity {
 
                                 Toast.makeText(
                                         this,
-                                        "FCM server javobi yo‘q",
+                                        "FCM API JAVOBI YO‘Q",
                                         Toast.LENGTH_LONG
                                 ).show();
 
@@ -700,10 +794,6 @@ public class MainActivity extends AppCompatActivity {
                             String clean =
                                     result;
 
-                            /*
-                             * evaluateJavascript
-                             * stringini ochamiz.
-                             */
                             if (
                                     clean.startsWith("\"")
                                     &&
@@ -759,9 +849,6 @@ public class MainActivity extends AppCompatActivity {
                                             ""
                                     );
 
-                            /*
-                             * JavaScript fetch xatosi.
-                             */
                             if (
                                     !error.isEmpty()
                             ) {
@@ -776,9 +863,6 @@ public class MainActivity extends AppCompatActivity {
                                 return;
                             }
 
-                            /*
-                             * PHP javobini ekranga chiqaramiz.
-                             */
                             Toast.makeText(
                                     this,
                                     "FCM API HTTP "
@@ -788,11 +872,6 @@ public class MainActivity extends AppCompatActivity {
                                     Toast.LENGTH_LONG
                             ).show();
 
-                            /*
-                             * Agar PHP:
-                             * {"ok":true,"saved":1}
-                             * qaytarsa, token saqlandi.
-                             */
                             try {
 
                                 JSONObject php =
@@ -802,21 +881,46 @@ public class MainActivity extends AppCompatActivity {
 
                                 boolean saved =
                                         php.optBoolean(
+                                                "saved",
+                                                false
+                                        );
+
+                                boolean ok =
+                                        php.optBoolean(
                                                 "ok",
                                                 false
                                         );
 
-                                prefs.edit()
-                                        .putBoolean(
-                                                "fcm_synced",
-                                                saved
-                                        )
-                                        .apply();
+                                if (
+                                        ok &&
+                                        saved
+                                ) {
+
+                                    Toast.makeText(
+                                            this,
+                                            "✅ FCM BAZAGA SAQLANDI",
+                                            Toast.LENGTH_LONG
+                                    ).show();
+
+                                    prefs.edit()
+                                            .putBoolean(
+                                                    "fcm_synced",
+                                                    true
+                                            )
+                                            .apply();
+
+                                } else {
+
+                                    Toast.makeText(
+                                            this,
+                                            "❌ FCM BAZAGA SAQLANMADI",
+                                            Toast.LENGTH_LONG
+                                    ).show();
+                                }
 
                             } catch (
                                     Exception ignored
                             ) {
-
                             }
 
                         } catch (
@@ -825,7 +929,7 @@ public class MainActivity extends AppCompatActivity {
 
                             Toast.makeText(
                                     this,
-                                    "FCM javobini o‘qishda xato:\n"
+                                    "FCM JAVOB XATO:\n"
                                             + e.getMessage(),
                                     Toast.LENGTH_LONG
                             ).show();
@@ -839,7 +943,7 @@ public class MainActivity extends AppCompatActivity {
 
             Toast.makeText(
                     this,
-                    "FCM yuborishda xato:\n"
+                    "FCM YUBORISH XATO:\n"
                             + e.getMessage(),
                     Toast.LENGTH_LONG
             ).show();
@@ -847,7 +951,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     // =========================================================
-    // LOCATION PERMISSION
+    // LOCATION
     // =========================================================
 
     private boolean hasLocationPermission() {
@@ -856,7 +960,9 @@ public class MainActivity extends AppCompatActivity {
                 this,
                 Manifest.permission.ACCESS_FINE_LOCATION
         ) == PackageManager.PERMISSION_GRANTED
+
                 ||
+
                 ContextCompat.checkSelfPermission(
                         this,
                         Manifest.permission.ACCESS_COARSE_LOCATION
@@ -869,9 +975,6 @@ public class MainActivity extends AppCompatActivity {
                 hasLocationPermission()
         ) {
 
-            /*
-             * Android 10+ background location.
-             */
             requestBackgroundLocation();
 
             return;
@@ -918,7 +1021,7 @@ public class MainActivity extends AppCompatActivity {
                         "Doimiy joylashuv"
                 )
                 .setMessage(
-                        "BirZum24 kuryerlar uchun buyurtma vaqtida joylashuvingizni fonda ham yuborishi kerak. Keyingi oynada \"Har doim ruxsat berish\"ni tanlang."
+                        "BirZum24 kuryer ilovasi buyurtma vaqtida joylashuvingizni fonda ham yuborishi kerak. Keyingi oynada \"Har doim ruxsat berish\"ni tanlang."
                 )
                 .setPositiveButton(
                         "Ruxsat berish",
@@ -947,7 +1050,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     // =========================================================
-    // NOTIFICATION PERMISSION
+    // NOTIFICATION
     // =========================================================
 
     private void requestNotificationPermission() {
@@ -982,7 +1085,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     // =========================================================
-    // CAMERA PERMISSION
+    // CAMERA
     // =========================================================
 
     private void requestCameraPermission() {
@@ -1009,7 +1112,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     // =========================================================
-    // LOCATION FOREGROUND SERVICE
+    // LOCATION SERVICE
     // =========================================================
 
     private void startLocationService() {
@@ -1045,7 +1148,7 @@ public class MainActivity extends AppCompatActivity {
 
             Toast.makeText(
                     this,
-                    "Location service xatosi:\n"
+                    "LOCATION SERVICE XATO:\n"
                             + e.getMessage(),
                     Toast.LENGTH_LONG
             ).show();
@@ -1053,7 +1156,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     // =========================================================
-    // PERMISSION RESULT
+    // PERMISSIONS RESULT
     // =========================================================
 
     @Override
@@ -1098,36 +1201,6 @@ public class MainActivity extends AppCompatActivity {
                 requestCode ==
                         BACKGROUND_LOCATION_REQUEST
         ) {
-
-            if (
-                    Build.VERSION.SDK_INT >=
-                            Build.VERSION_CODES.Q
-            ) {
-
-                if (
-                        ContextCompat.checkSelfPermission(
-                                this,
-                                Manifest.permission.ACCESS_BACKGROUND_LOCATION
-                        )
-                        ==
-                        PackageManager.PERMISSION_GRANTED
-                ) {
-
-                    Toast.makeText(
-                            this,
-                            "Fonda joylashuv ruxsati berildi",
-                            Toast.LENGTH_SHORT
-                    ).show();
-
-                } else {
-
-                    Toast.makeText(
-                            this,
-                            "Fonda joylashuv ruxsati berilmadi",
-                            Toast.LENGTH_LONG
-                    ).show();
-                }
-            }
 
             syncSessionAndTracking();
 
@@ -1203,7 +1276,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     // =========================================================
-    // BACK BUTTON
+    // BACK
     // =========================================================
 
     private void setupBackButton() {
@@ -1236,7 +1309,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     // =========================================================
-    // ACTIVITY RESUME
+    // RESUME
     // =========================================================
 
     @Override
@@ -1244,21 +1317,17 @@ public class MainActivity extends AppCompatActivity {
 
         super.onResume();
 
-        /*
-         * Ilova qayta ochilganda sessionni
-         * qayta tekshiramiz.
-         */
         if (webView != null) {
 
             webView.postDelayed(
                     this::syncSessionAndTracking,
-                    500
+                    1000
             );
         }
     }
 
     // =========================================================
-    // ACTIVITY DESTROY
+    // DESTROY
     // =========================================================
 
     @Override
