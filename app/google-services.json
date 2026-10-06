@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "171922178789",
+    "project_id": "birzum24",
+    "storage_bucket": "birzum24.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:171922178789:android:fce4ebd28c456e384dca0c",
+        "android_client_info": {
+          "package_name": "com.birzum24.delivery"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBPl_RZnuIn4McwEdarYPeafETVpmmZEEs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
