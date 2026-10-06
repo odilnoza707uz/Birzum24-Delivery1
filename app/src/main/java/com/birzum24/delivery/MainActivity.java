@@ -8,7 +8,6 @@ import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
-import android.os.PowerManager;
 import android.provider.Settings;
 import android.webkit.CookieManager;
 import android.webkit.GeolocationPermissions;
@@ -24,7 +23,6 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import androidx.core.view.WindowCompat;
-import androidx.core.view.WindowInsetsCompat;
 import androidx.core.view.WindowInsetsControllerCompat;
 
 import org.json.JSONObject;
@@ -35,34 +33,24 @@ public class MainActivity extends AppCompatActivity {
             "https://birzum.asakaedu.uz/c/";
 
     private static final int LOCATION_REQUEST = 1001;
-
     private static final int NOTIFICATION_REQUEST = 1002;
-
     private static final int CAMERA_REQUEST = 1003;
+    private static final int BACKGROUND_LOCATION_REQUEST = 1011;
 
     private WebView webView;
-
     private SharedPreferences prefs;
 
-
     @Override
-    protected void onCreate(
-            Bundle savedInstanceState
-    ) {
-
+    protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-
         /*
-         * Muhim:
-         * WebView status bar ostiga kirib ketmaydi.
+         * WebView status bar ostiga kirib ketmasligi uchun.
          */
-
         WindowCompat.setDecorFitsSystemWindows(
                 getWindow(),
                 true
         );
-
 
         WindowInsetsControllerCompat controller =
                 WindowCompat.getInsetsController(
@@ -70,110 +58,65 @@ public class MainActivity extends AppCompatActivity {
                         getWindow().getDecorView()
                 );
 
-
         controller.setAppearanceLightStatusBars(false);
-
         controller.setAppearanceLightNavigationBars(false);
 
-
-        prefs =
-                getSharedPreferences(
-                        "birzum_delivery",
-                        MODE_PRIVATE
-                );
-
-
-        setContentView(
-                R.layout.activity_main
+        prefs = getSharedPreferences(
+                "birzum_delivery",
+                MODE_PRIVATE
         );
 
+        setContentView(R.layout.activity_main);
 
-        webView =
-                findViewById(
-                        R.id.webView
-                );
-
+        webView = findViewById(R.id.webView);
 
         setupWebView();
 
-
         requestNotificationPermission();
-
-
         requestLocationPermission();
 
-
         setupBackButton();
-
 
         webView.loadUrl(URL);
     }
 
-
     private void setupWebView() {
 
-        WebSettings settings =
-                webView.getSettings();
-
+        WebSettings settings = webView.getSettings();
 
         settings.setJavaScriptEnabled(true);
-
         settings.setDomStorageEnabled(true);
-
         settings.setDatabaseEnabled(true);
-
         settings.setGeolocationEnabled(true);
 
-
         settings.setAllowFileAccess(true);
-
         settings.setAllowContentAccess(true);
 
+        settings.setJavaScriptCanOpenWindowsAutomatically(true);
+        settings.setSupportMultipleWindows(false);
 
-        settings.setJavaScriptCanOpenWindowsAutomatically(
-                true
-        );
-
-
-        settings.setSupportMultipleWindows(
-                false
-        );
-
-
-        settings.setMediaPlaybackRequiresUserGesture(
-                false
-        );
-
+        settings.setMediaPlaybackRequiresUserGesture(false);
 
         settings.setBuiltInZoomControls(false);
-
         settings.setDisplayZoomControls(false);
 
-
         settings.setLoadWithOverviewMode(false);
-
         settings.setUseWideViewPort(false);
 
-
         /*
-         * Cookie juda muhim.
+         * Cookie.
          */
-
         CookieManager cookieManager =
                 CookieManager.getInstance();
 
         cookieManager.setAcceptCookie(true);
 
-
-        if (Build.VERSION.SDK_INT >=
-                Build.VERSION_CODES.LOLLIPOP) {
-
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             cookieManager.setAcceptThirdPartyCookies(
                     webView,
                     true
             );
         }
-
 
         webView.setWebViewClient(
                 new WebViewClient() {
@@ -184,21 +127,13 @@ public class MainActivity extends AppCompatActivity {
                             String url
                     ) {
 
-                        super.onPageFinished(
-                                view,
-                                url
-                        );
-
+                        super.onPageFinished(view, url);
 
                         syncSessionAndTracking();
 
-
                         /*
-                         * Login/PIN holati o‘zgarishi
-                         * mumkinligi uchun vaqti-vaqti bilan
-                         * tekshiramiz.
+                         * Login/PIN holati o'zgarishi mumkin.
                          */
-
                         view.postDelayed(
                                 MainActivity.this::syncSessionAndTracking,
                                 3000
@@ -206,7 +141,6 @@ public class MainActivity extends AppCompatActivity {
                     }
                 }
         );
-
 
         webView.setWebChromeClient(
                 new WebChromeClient() {
@@ -237,7 +171,6 @@ public class MainActivity extends AppCompatActivity {
                         }
                     }
 
-
                     @Override
                     public void onPermissionRequest(
                             PermissionRequest request
@@ -248,24 +181,18 @@ public class MainActivity extends AppCompatActivity {
                             String[] resources =
                                     request.getResources();
 
+                            boolean camera = false;
 
-                            boolean camera =
-                                    false;
-
-
-                            for (String resource :
-                                    resources) {
+                            for (String resource : resources) {
 
                                 if (PermissionRequest
                                         .RESOURCE_VIDEO_CAPTURE
                                         .equals(resource)) {
 
                                     camera = true;
-
                                     break;
                                 }
                             }
-
 
                             if (camera) {
 
@@ -291,46 +218,30 @@ public class MainActivity extends AppCompatActivity {
         );
     }
 
-
     /*
      * WebView'dan PHP session cookie +
      * CSRF tokenni olamiz.
      */
-
     private void syncSessionAndTracking() {
 
         if (webView == null) {
             return;
         }
 
-
         CookieManager cookieManager =
                 CookieManager.getInstance();
 
-
         String cookie =
-                cookieManager.getCookie(
-                        URL
-                );
+                cookieManager.getCookie(URL);
 
-
-        if (cookie == null ||
-                cookie.isEmpty()) {
-
+        if (cookie == null || cookie.isEmpty()) {
             return;
         }
 
-
         /*
          * PHP:
-         *
          * POST /c/api.php?a=state
-         *
-         * state CSRF token qaytaradi.
-         *
-         * Bu endpoint CSRF talab qilmaydi.
          */
-
         String js =
                 "(async function(){"
                         + "try{"
@@ -346,7 +257,6 @@ public class MainActivity extends AppCompatActivity {
                         + "}"
                         + "})()";
 
-
         webView.evaluateJavascript(
                 js,
                 result -> {
@@ -355,65 +265,36 @@ public class MainActivity extends AppCompatActivity {
 
                         if (result == null ||
                                 result.equals("null")) {
-
                             return;
                         }
 
-
-                        String clean =
-                                result;
-
-
-                        if (clean.startsWith("\"")
-                                && clean.endsWith("\"")) {
-
-                            clean =
-                                    JSONObject
-                                            .quote(
-                                                    clean
-                                            )
-                                            .replace(
-                                                    "\\\"",
-                                                    "\""
-                                            );
-                        }
-
+                        String clean = result;
 
                         /*
-                         * evaluateJavascript JSON
-                         * string formatini tozalash.
+                         * evaluateJavascript JSON string
+                         * formatini tozalash.
                          */
-
-                        clean =
-                                clean
-                                        .replace("\\\"", "\"")
-                                        .replace("\\n", "")
-                                        .replace("\\/", "/");
-
-
                         if (clean.startsWith("\"")
                                 && clean.endsWith("\"")) {
 
-                            clean =
-                                    clean.substring(
-                                            1,
-                                            clean.length() - 1
-                                    );
+                            clean = clean.substring(
+                                    1,
+                                    clean.length() - 1
+                            );
                         }
 
+                        clean = clean
+                                .replace("\\\"", "\"")
+                                .replace("\\n", "")
+                                .replace("\\/", "/")
+                                .replace("\\\\", "\\");
 
                         JSONObject data =
                                 new JSONObject(clean);
 
-
-                        if (!data.optBoolean(
-                                "ok",
-                                false
-                        )) {
-
+                        if (!data.optBoolean("ok", false)) {
                             return;
                         }
-
 
                         String csrf =
                                 data.optString(
@@ -421,44 +302,35 @@ public class MainActivity extends AppCompatActivity {
                                         ""
                                 );
 
-
                         String stage =
                                 data.optString(
                                         "stage",
                                         "login"
                                 );
 
-
                         if (csrf.isEmpty()) {
                             return;
                         }
 
-
                         prefs.edit()
-
                                 .putString(
                                         "cookie",
                                         cookie
                                 )
-
                                 .putString(
                                         "csrf",
                                         csrf
                                 )
-
                                 .putString(
                                         "stage",
                                         stage
                                 )
-
                                 .apply();
 
-
                         /*
-                         * Faqat courier ready bo‘lganda
+                         * Faqat courier ready bo'lganda
                          * GPS service ishga tushadi.
                          */
-
                         if ("ready".equals(stage)
                                 && hasLocationPermission()) {
 
@@ -476,7 +348,6 @@ public class MainActivity extends AppCompatActivity {
         );
     }
 
-
     private boolean hasLocationPermission() {
 
         return ContextCompat.checkSelfPermission(
@@ -490,7 +361,6 @@ public class MainActivity extends AppCompatActivity {
                 ) == PackageManager.PERMISSION_GRANTED;
     }
 
-
     private boolean hasFineLocationPermission() {
 
         return ContextCompat.checkSelfPermission(
@@ -499,61 +369,44 @@ public class MainActivity extends AppCompatActivity {
         ) == PackageManager.PERMISSION_GRANTED;
     }
 
-
     private void requestLocationPermission() {
 
-        if (Build.VERSION.SDK_INT >=
-                Build.VERSION_CODES.M) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
 
             if (!hasLocationPermission()) {
 
                 ActivityCompat.requestPermissions(
-
                         this,
-
                         new String[]{
-
                                 Manifest.permission.ACCESS_FINE_LOCATION,
-
                                 Manifest.permission.ACCESS_COARSE_LOCATION
-
                         },
-
                         LOCATION_REQUEST
                 );
             }
         }
     }
 
-
     private void requestBackgroundLocationPermission() {
 
-        if (Build.VERSION.SDK_INT <
-                Build.VERSION_CODES.Q) {
-
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
             return;
         }
 
-
-        if (Build.VERSION.SDK_INT >=
-                Build.VERSION_CODES.R) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
 
             /*
-             * Android 11+:
-             * Background locationni
-             * system settings orqali berish kerak.
+             * Android 11+ da background location
+             * foydalanuvchi tomonidan Settings orqali
+             * beriladi.
              */
-
             new AlertDialog.Builder(this)
-
                     .setTitle(
                             "Fonda joylashuvga ruxsat"
                     )
-
                     .setMessage(
                             "BirZum24 Delivery kuryer buyurtmasini yetkazayotgan paytda ilova yopiq yoki ekran o‘chiq bo‘lsa ham joylashuvni yuborishi kerak."
                     )
-
                     .setPositiveButton(
                             "Sozlamalarni ochish",
                             (dialog, which) -> {
@@ -585,12 +438,10 @@ public class MainActivity extends AppCompatActivity {
                                 }
                             }
                     )
-
                     .setNegativeButton(
                             "Keyinroq",
                             null
                     )
-
                     .show();
 
         } else {
@@ -601,19 +452,15 @@ public class MainActivity extends AppCompatActivity {
             ) != PackageManager.PERMISSION_GRANTED) {
 
                 ActivityCompat.requestPermissions(
-
                         this,
-
                         new String[]{
                                 Manifest.permission.ACCESS_BACKGROUND_LOCATION
                         },
-
-                        LOCATION_REQUEST + 10
+                        BACKGROUND_LOCATION_REQUEST
                 );
             }
         }
     }
-
 
     private void requestNotificationPermission() {
 
@@ -626,19 +473,15 @@ public class MainActivity extends AppCompatActivity {
             ) != PackageManager.PERMISSION_GRANTED) {
 
                 ActivityCompat.requestPermissions(
-
                         this,
-
                         new String[]{
                                 Manifest.permission.POST_NOTIFICATIONS
                         },
-
                         NOTIFICATION_REQUEST
                 );
             }
         }
     }
-
 
     private void requestCameraPermission() {
 
@@ -648,18 +491,14 @@ public class MainActivity extends AppCompatActivity {
         ) != PackageManager.PERMISSION_GRANTED) {
 
             ActivityCompat.requestPermissions(
-
                     this,
-
                     new String[]{
                             Manifest.permission.CAMERA
                     },
-
                     CAMERA_REQUEST
             );
         }
     }
-
 
     private void startLocationService() {
 
@@ -668,7 +507,6 @@ public class MainActivity extends AppCompatActivity {
                         this,
                         LocationForegroundService.class
                 );
-
 
         if (Build.VERSION.SDK_INT >=
                 Build.VERSION_CODES.O) {
@@ -681,7 +519,6 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-
     private void stopLocationService() {
 
         Intent intent =
@@ -690,26 +527,21 @@ public class MainActivity extends AppCompatActivity {
                         LocationForegroundService.class
                 );
 
-
         stopService(intent);
     }
-
 
     private void setupBackButton() {
 
         getOnBackPressedDispatcher()
                 .addCallback(
-
                         this,
-
                         new OnBackPressedCallback(true) {
 
                             @Override
                             public void handleOnBackPressed() {
 
                                 if (webView != null
-                                        &&
-                                        webView.canGoBack()) {
+                                        && webView.canGoBack()) {
 
                                     webView.goBack();
 
@@ -721,7 +553,6 @@ public class MainActivity extends AppCompatActivity {
                         }
                 );
     }
-
 
     @Override
     public void onRequestPermissionsResult(
@@ -736,7 +567,6 @@ public class MainActivity extends AppCompatActivity {
                 grantResults
         );
 
-
         if (requestCode == LOCATION_REQUEST) {
 
             if (hasLocationPermission()) {
@@ -747,13 +577,10 @@ public class MainActivity extends AppCompatActivity {
                         Toast.LENGTH_SHORT
                 ).show();
 
-
                 /*
                  * Android 10+ background location.
                  */
-
                 requestBackgroundLocationPermission();
-
 
                 syncSessionAndTracking();
 
@@ -767,10 +594,105 @@ public class MainActivity extends AppCompatActivity {
             }
         }
 
-
-        if (requestCode ==
-                LOCATION_REQUEST + 10) {
+        if (requestCode == BACKGROUND_LOCATION_REQUEST) {
 
             if (hasLocationPermission()) {
 
                 syncSessionAndTracking();
+            }
+        }
+
+        if (requestCode == NOTIFICATION_REQUEST) {
+
+            if (ContextCompat.checkSelfPermission(
+                    this,
+                    Manifest.permission.POST_NOTIFICATIONS
+            ) == PackageManager.PERMISSION_GRANTED) {
+
+                Toast.makeText(
+                        this,
+                        "Bildirishnomalarga ruxsat berildi",
+                        Toast.LENGTH_SHORT
+                ).show();
+
+            } else {
+
+                Toast.makeText(
+                        this,
+                        "Bildirishnoma ruxsati berilmadi.",
+                        Toast.LENGTH_SHORT
+                ).show();
+            }
+        }
+
+        if (requestCode == CAMERA_REQUEST) {
+
+            if (ContextCompat.checkSelfPermission(
+                    this,
+                    Manifest.permission.CAMERA
+            ) == PackageManager.PERMISSION_GRANTED) {
+
+                Toast.makeText(
+                        this,
+                        "Kameraga ruxsat berildi",
+                        Toast.LENGTH_SHORT
+                ).show();
+
+                /*
+                 * WebView permission request oldin
+                 * yuborilgan bo'lishi mumkin.
+                 *
+                 * Sahifani qayta yuklash orqali
+                 * kamera permissionini yangilaymiz.
+                 */
+                if (webView != null) {
+                    webView.reload();
+                }
+
+            } else {
+
+                Toast.makeText(
+                        this,
+                        "Kameraga ruxsat berilmadi.",
+                        Toast.LENGTH_SHORT
+                ).show();
+            }
+        }
+    }
+
+    @Override
+    protected void onResume() {
+
+        super.onResume();
+
+        /*
+         * Settings'dan qaytganda permission/sessionni
+         * qayta tekshiramiz.
+         */
+        if (webView != null) {
+            syncSessionAndTracking();
+        }
+    }
+
+    @Override
+    protected void onDestroy() {
+
+        /*
+         * Activity yopilganda WebView resurslarini tozalaymiz.
+         *
+         * LocationForegroundService esa alohida ishlashda
+         * davom etadi.
+         */
+        if (webView != null) {
+
+            webView.stopLoading();
+            webView.setWebChromeClient(null);
+            webView.setWebViewClient(null);
+            webView.destroy();
+
+            webView = null;
+        }
+
+        super.onDestroy();
+    }
+}
