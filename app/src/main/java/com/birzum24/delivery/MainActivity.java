@@ -74,11 +74,18 @@ public class MainActivity extends AppCompatActivity {
 
         setupWebView();
 
+        /*
+         * Notification ruxsati.
+         */
         requestNotificationPermission();
+
+        /*
+         * Location ruxsati.
+         */
         requestLocationPermission();
 
         /*
-         * FCM tokenni olish.
+         * Firebase FCM tokenini olish.
          */
         getFcmToken();
 
@@ -87,9 +94,16 @@ public class MainActivity extends AppCompatActivity {
         webView.loadUrl(URL);
     }
 
+    /*
+     * ============================================================
+     * WEBVIEW
+     * ============================================================
+     */
+
     private void setupWebView() {
 
-        WebSettings settings = webView.getSettings();
+        WebSettings settings =
+                webView.getSettings();
 
         settings.setJavaScriptEnabled(true);
         settings.setDomStorageEnabled(true);
@@ -99,10 +113,15 @@ public class MainActivity extends AppCompatActivity {
         settings.setAllowFileAccess(true);
         settings.setAllowContentAccess(true);
 
-        settings.setJavaScriptCanOpenWindowsAutomatically(true);
+        settings.setJavaScriptCanOpenWindowsAutomatically(
+                true
+        );
+
         settings.setSupportMultipleWindows(false);
 
-        settings.setMediaPlaybackRequiresUserGesture(false);
+        settings.setMediaPlaybackRequiresUserGesture(
+                false
+        );
 
         settings.setBuiltInZoomControls(false);
         settings.setDisplayZoomControls(false);
@@ -115,7 +134,9 @@ public class MainActivity extends AppCompatActivity {
 
         cookieManager.setAcceptCookie(true);
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+        if (Build.VERSION.SDK_INT >=
+                Build.VERSION_CODES.LOLLIPOP) {
+
             cookieManager.setAcceptThirdPartyCookies(
                     webView,
                     true
@@ -131,12 +152,16 @@ public class MainActivity extends AppCompatActivity {
                             String url
                     ) {
 
-                        super.onPageFinished(view, url);
+                        super.onPageFinished(
+                                view,
+                                url
+                        );
 
                         syncSessionAndTracking();
 
                         view.postDelayed(
-                                MainActivity.this::syncSessionAndTracking,
+                                MainActivity.this::
+                                        syncSessionAndTracking,
                                 3000
                         );
                     }
@@ -184,11 +209,14 @@ public class MainActivity extends AppCompatActivity {
 
                             boolean camera = false;
 
-                            for (String resource : resources) {
+                            for (String resource :
+                                    resources) {
 
-                                if (PermissionRequest
-                                        .RESOURCE_VIDEO_CAPTURE
-                                        .equals(resource)) {
+                                if (
+                                        PermissionRequest
+                                                .RESOURCE_VIDEO_CAPTURE
+                                                .equals(resource)
+                                ) {
 
                                     camera = true;
                                     break;
@@ -197,12 +225,19 @@ public class MainActivity extends AppCompatActivity {
 
                             if (camera) {
 
-                                if (ContextCompat.checkSelfPermission(
-                                        MainActivity.this,
-                                        Manifest.permission.CAMERA
-                                ) == PackageManager.PERMISSION_GRANTED) {
+                                if (
+                                        ContextCompat
+                                                .checkSelfPermission(
+                                                        MainActivity.this,
+                                                        Manifest.permission.CAMERA
+                                                )
+                                                ==
+                                                PackageManager.PERMISSION_GRANTED
+                                ) {
 
-                                    request.grant(resources);
+                                    request.grant(
+                                            resources
+                                    );
 
                                 } else {
 
@@ -211,7 +246,9 @@ public class MainActivity extends AppCompatActivity {
 
                             } else {
 
-                                request.grant(resources);
+                                request.grant(
+                                        resources
+                                );
                             }
                         });
                     }
@@ -220,40 +257,86 @@ public class MainActivity extends AppCompatActivity {
     }
 
     /*
-     * Firebase FCM tokenini olamiz.
+     * ============================================================
+     * FCM TOKEN
+     * ============================================================
      */
+
     private void getFcmToken() {
 
-        FirebaseMessaging.getInstance()
+        FirebaseMessaging
+                .getInstance()
                 .getToken()
                 .addOnCompleteListener(task -> {
 
                     if (!task.isSuccessful()) {
+
+                        String error =
+                                task.getException() != null
+                                        ? task.getException()
+                                        .getMessage()
+                                        : "Noma'lum Firebase xatosi";
+
+                        Toast.makeText(
+                                MainActivity.this,
+                                "FCM TOKEN XATO:\n" + error,
+                                Toast.LENGTH_LONG
+                        ).show();
+
                         return;
                     }
 
-                    String token = task.getResult();
+                    String token =
+                            task.getResult();
 
-                    if (token == null || token.trim().isEmpty()) {
+                    if (
+                            token == null
+                                    ||
+                            token.trim().isEmpty()
+                    ) {
+
+                        Toast.makeText(
+                                MainActivity.this,
+                                "FCM TOKEN BO‘SH",
+                                Toast.LENGTH_LONG
+                        ).show();
+
                         return;
                     }
 
+                    /*
+                     * Tokenni telefonda saqlaymiz.
+                     */
                     prefs.edit()
-                            .putString("fcm_token", token)
+                            .putString(
+                                    "fcm_token",
+                                    token
+                            )
                             .apply();
 
                     /*
-                     * Agar WebView allaqachon login bo'lgan bo'lsa,
-                     * tokenni serverga yuborishga harakat qilamiz.
+                     * Diagnostika.
+                     */
+                    Toast.makeText(
+                            MainActivity.this,
+                            "FCM TOKEN OLINDI",
+                            Toast.LENGTH_SHORT
+                    ).show();
+
+                    /*
+                     * Agar WebView login bo'lgan bo'lsa,
+                     * token serverga yuboriladi.
                      */
                     syncSessionAndTracking();
                 });
     }
 
     /*
-     * WebView'dan PHP session cookie +
-     * CSRF tokenni olamiz.
+     * ============================================================
+     * SESSION + TRACKING + FCM SYNC
+     * ============================================================
      */
+
     private void syncSessionAndTracking() {
 
         if (webView == null) {
@@ -266,7 +349,11 @@ public class MainActivity extends AppCompatActivity {
         String cookie =
                 cookieManager.getCookie(URL);
 
-        if (cookie == null || cookie.isEmpty()) {
+        if (
+                cookie == null
+                        ||
+                cookie.isEmpty()
+        ) {
             return;
         }
 
@@ -291,32 +378,65 @@ public class MainActivity extends AppCompatActivity {
 
                     try {
 
-                        if (result == null ||
-                                result.equals("null")) {
+                        if (
+                                result == null
+                                        ||
+                                result.equals("null")
+                        ) {
                             return;
                         }
 
-                        String clean = result;
+                        String clean =
+                                result;
 
-                        if (clean.startsWith("\"")
-                                && clean.endsWith("\"")) {
+                        /*
+                         * evaluateJavascript
+                         * qaytargan JSON stringni
+                         * ochamiz.
+                         */
+                        if (
+                                clean.startsWith("\"")
+                                        &&
+                                clean.endsWith("\"")
+                        ) {
 
-                            clean = clean.substring(
-                                    1,
-                                    clean.length() - 1
-                            );
+                            clean =
+                                    clean.substring(
+                                            1,
+                                            clean.length() - 1
+                                    );
                         }
 
-                        clean = clean
-                                .replace("\\\"", "\"")
-                                .replace("\\n", "")
-                                .replace("\\/", "/")
-                                .replace("\\\\", "\\");
+                        clean =
+                                clean
+                                        .replace(
+                                                "\\\"",
+                                                "\""
+                                        )
+                                        .replace(
+                                                "\\n",
+                                                ""
+                                        )
+                                        .replace(
+                                                "\\/",
+                                                "/"
+                                        )
+                                        .replace(
+                                                "\\\\",
+                                                "\\"
+                                        );
 
                         JSONObject data =
-                                new JSONObject(clean);
+                                new JSONObject(
+                                        clean
+                                );
 
-                        if (!data.optBoolean("ok", false)) {
+                        if (
+                                !data.optBoolean(
+                                        "ok",
+                                        false
+                                )
+                        ) {
                             return;
                         }
 
@@ -332,7 +452,9 @@ public class MainActivity extends AppCompatActivity {
                                         "login"
                                 );
 
-                        if (csrf.isEmpty()) {
+                        if (
+                                csrf.isEmpty()
+                        ) {
                             return;
                         }
 
@@ -352,14 +474,23 @@ public class MainActivity extends AppCompatActivity {
                                 .apply();
 
                         /*
-                         * FCM tokenni faqat courier ready
-                         * bo'lganda serverga yuboramiz.
+                         * Faqat kuryer ready bo'lganda:
+                         *
+                         * 1. FCM token serverga yuboriladi.
+                         * 2. Location foreground service ishga tushadi.
                          */
-                        if ("ready".equals(stage)) {
+                        if (
+                                "ready".equals(stage)
+                        ) {
 
-                            syncFcmTokenToServer(csrf);
+                            syncFcmTokenToServer(
+                                    csrf
+                            );
 
-                            if (hasLocationPermission()) {
+                            if (
+                                    hasLocationPermission()
+                            ) {
+
                                 startLocationService();
                             }
                         }
@@ -367,7 +498,7 @@ public class MainActivity extends AppCompatActivity {
                     } catch (Exception e) {
 
                         /*
-                         * JSON xatosi trackingni
+                         * JSON xatosi ilovani
                          * yiqitmasin.
                          */
                     }
@@ -376,18 +507,27 @@ public class MainActivity extends AppCompatActivity {
     }
 
     /*
-     * FCM tokenni PHP API'ga yuborish.
-     *
-     * /c/api.php?a=fcm_token
-     *
-     * Bu endpointni keyingi bosqichda PHP'ga qo'shamiz.
+     * ============================================================
+     * FCM TOKEN -> PHP
+     * ============================================================
      */
-    private void syncFcmTokenToServer(String csrf) {
+
+    private void syncFcmTokenToServer(
+            String csrf
+    ) {
 
         String token =
-                prefs.getString("fcm_token", "");
+                prefs.getString(
+                        "fcm_token",
+                        ""
+                );
 
-        if (token == null || token.trim().isEmpty()) {
+        if (
+                token == null
+                        ||
+                token.trim().isEmpty()
+        ) {
+
             return;
         }
 
@@ -396,7 +536,10 @@ public class MainActivity extends AppCompatActivity {
             JSONObject body =
                     new JSONObject();
 
-            body.put("token", token);
+            body.put(
+                    "token",
+                    token
+            );
 
             String bodyJson =
                     body.toString();
@@ -406,10 +549,14 @@ public class MainActivity extends AppCompatActivity {
              * xavfsiz JSON.
              */
             String escaped =
-                    JSONObject.quote(bodyJson);
+                    JSONObject.quote(
+                            bodyJson
+                    );
 
             String csrfEscaped =
-                    JSONObject.quote(csrf);
+                    JSONObject.quote(
+                            csrf
+                    );
 
             String js =
                     "(async function(){"
@@ -419,9 +566,11 @@ public class MainActivity extends AppCompatActivity {
                             + "credentials:'include',"
                             + "headers:{"
                             + "'Content-Type':'application/json',"
-                            + "'X-CSRF-Token':" + csrfEscaped
+                            + "'X-CSRF-Token':"
+                            + csrfEscaped
                             + "},"
-                            + "body:" + escaped
+                            + "body:"
+                            + escaped
                             + "});"
                             + "const j=await r.json();"
                             + "return JSON.stringify(j);"
@@ -433,9 +582,86 @@ public class MainActivity extends AppCompatActivity {
             webView.evaluateJavascript(
                     js,
                     result -> {
+
                         /*
-                         * Hozircha javobni ko'rsatmaymiz.
+                         * Diagnostika:
+                         * server javobini ko'ramiz.
                          */
+                        if (
+                                result == null
+                                        ||
+                                result.equals("null")
+                        ) {
+                            return;
+                        }
+
+                        try {
+
+                            String clean =
+                                    result;
+
+                            if (
+                                    clean.startsWith("\"")
+                                            &&
+                                    clean.endsWith("\"")
+                            ) {
+
+                                clean =
+                                        clean.substring(
+                                                1,
+                                                clean.length() - 1
+                                        );
+                            }
+
+                            clean =
+                                    clean
+                                            .replace(
+                                                    "\\\"",
+                                                    "\""
+                                            )
+                                            .replace(
+                                                    "\\\\",
+                                                    "\\"
+                                            );
+
+                            JSONObject response =
+                                    new JSONObject(
+                                            clean
+                                    );
+
+                            if (
+                                    response.optBoolean(
+                                            "ok",
+                                            false
+                                    )
+                            ) {
+
+                                /*
+                                 * Token serverga yozildi.
+                                 */
+                                prefs.edit()
+                                        .putBoolean(
+                                                "fcm_synced",
+                                                true
+                                        )
+                                        .apply();
+
+                            } else {
+
+                                /*
+                                 * Server tokenni qabul qilmadi.
+                                 */
+                                prefs.edit()
+                                        .putBoolean(
+                                                "fcm_synced",
+                                                false
+                                        )
+                                        .apply();
+                            }
+
+                        } catch (Exception ignored) {
+
+                        }
                     }
             );
 
@@ -446,6 +672,12 @@ public class MainActivity extends AppCompatActivity {
              */
         }
     }
+
+    /*
+     * ============================================================
+     * LOCATION
+     * ============================================================
+     */
 
     private boolean hasLocationPermission() {
 
@@ -470,15 +702,20 @@ public class MainActivity extends AppCompatActivity {
 
     private void requestLocationPermission() {
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+        if (
+                Build.VERSION.SDK_INT >=
+                        Build.VERSION_CODES.M
+        ) {
 
             if (!hasLocationPermission()) {
 
                 ActivityCompat.requestPermissions(
                         this,
                         new String[]{
-                                Manifest.permission.ACCESS_FINE_LOCATION,
-                                Manifest.permission.ACCESS_COARSE_LOCATION
+                                Manifest.permission
+                                        .ACCESS_FINE_LOCATION,
+                                Manifest.permission
+                                        .ACCESS_COARSE_LOCATION
                         },
                         LOCATION_REQUEST
                 );
@@ -488,11 +725,18 @@ public class MainActivity extends AppCompatActivity {
 
     private void requestBackgroundLocationPermission() {
 
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+        if (
+                Build.VERSION.SDK_INT <
+                        Build.VERSION_CODES.Q
+        ) {
+
             return;
         }
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+        if (
+                Build.VERSION.SDK_INT >=
+                        Build.VERSION_CODES.R
+        ) {
 
             new AlertDialog.Builder(this)
                     .setTitle(
@@ -509,26 +753,35 @@ public class MainActivity extends AppCompatActivity {
 
                                     Intent intent =
                                             new Intent(
-                                                    Settings.ACTION_APPLICATION_DETAILS_SETTINGS
+                                                    Settings
+                                                            .ACTION_APPLICATION_DETAILS_SETTINGS
                                             );
 
                                     intent.setData(
                                             Uri.parse(
                                                     "package:"
-                                                            + getPackageName()
+                                                            +
+                                                    getPackageName()
                                             )
                                     );
 
-                                    startActivity(intent);
+                                    startActivity(
+                                            intent
+                                    );
 
-                                } catch (Exception e) {
+                                } catch (
+                                        Exception e
+                                ) {
 
                                     Intent intent =
                                             new Intent(
-                                                    Settings.ACTION_SETTINGS
+                                                    Settings
+                                                            .ACTION_SETTINGS
                                             );
 
-                                    startActivity(intent);
+                                    startActivity(
+                                            intent
+                                    );
                                 }
                             }
                     )
@@ -540,15 +793,21 @@ public class MainActivity extends AppCompatActivity {
 
         } else {
 
-            if (ContextCompat.checkSelfPermission(
-                    this,
-                    Manifest.permission.ACCESS_BACKGROUND_LOCATION
-            ) != PackageManager.PERMISSION_GRANTED) {
+            if (
+                    ContextCompat.checkSelfPermission(
+                            this,
+                            Manifest.permission
+                                    .ACCESS_BACKGROUND_LOCATION
+                    )
+                    !=
+                    PackageManager.PERMISSION_GRANTED
+            ) {
 
                 ActivityCompat.requestPermissions(
                         this,
                         new String[]{
-                                Manifest.permission.ACCESS_BACKGROUND_LOCATION
+                                Manifest.permission
+                                        .ACCESS_BACKGROUND_LOCATION
                         },
                         BACKGROUND_LOCATION_REQUEST
                 );
@@ -556,20 +815,34 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    /*
+     * ============================================================
+     * NOTIFICATION PERMISSION
+     * ============================================================
+     */
+
     private void requestNotificationPermission() {
 
-        if (Build.VERSION.SDK_INT >=
-                Build.VERSION_CODES.TIRAMISU) {
+        if (
+                Build.VERSION.SDK_INT >=
+                        Build.VERSION_CODES.TIRAMISU
+        ) {
 
-            if (ContextCompat.checkSelfPermission(
-                    this,
-                    Manifest.permission.POST_NOTIFICATIONS
-            ) != PackageManager.PERMISSION_GRANTED) {
+            if (
+                    ContextCompat.checkSelfPermission(
+                            this,
+                            Manifest.permission
+                                    .POST_NOTIFICATIONS
+                    )
+                    !=
+                    PackageManager.PERMISSION_GRANTED
+            ) {
 
                 ActivityCompat.requestPermissions(
                         this,
                         new String[]{
-                                Manifest.permission.POST_NOTIFICATIONS
+                                Manifest.permission
+                                        .POST_NOTIFICATIONS
                         },
                         NOTIFICATION_REQUEST
                 );
@@ -577,12 +850,22 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    /*
+     * ============================================================
+     * CAMERA
+     * ============================================================
+     */
+
     private void requestCameraPermission() {
 
-        if (ContextCompat.checkSelfPermission(
-                this,
-                Manifest.permission.CAMERA
-        ) != PackageManager.PERMISSION_GRANTED) {
+        if (
+                ContextCompat.checkSelfPermission(
+                        this,
+                        Manifest.permission.CAMERA
+                )
+                !=
+                PackageManager.PERMISSION_GRANTED
+        ) {
 
             ActivityCompat.requestPermissions(
                     this,
@@ -594,6 +877,12 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    /*
+     * ============================================================
+     * LOCATION FOREGROUND SERVICE
+     * ============================================================
+     */
+
     private void startLocationService() {
 
         Intent intent =
@@ -602,14 +891,20 @@ public class MainActivity extends AppCompatActivity {
                         LocationForegroundService.class
                 );
 
-        if (Build.VERSION.SDK_INT >=
-                Build.VERSION_CODES.O) {
+        if (
+                Build.VERSION.SDK_INT >=
+                        Build.VERSION_CODES.O
+        ) {
 
-            startForegroundService(intent);
+            startForegroundService(
+                    intent
+            );
 
         } else {
 
-            startService(intent);
+            startService(
+                    intent
+            );
         }
     }
 
@@ -621,8 +916,16 @@ public class MainActivity extends AppCompatActivity {
                         LocationForegroundService.class
                 );
 
-        stopService(intent);
+        stopService(
+                intent
+        );
     }
+
+    /*
+     * ============================================================
+     * BACK BUTTON
+     * ============================================================
+     */
 
     private void setupBackButton() {
 
@@ -634,8 +937,11 @@ public class MainActivity extends AppCompatActivity {
                             @Override
                             public void handleOnBackPressed() {
 
-                                if (webView != null
-                                        && webView.canGoBack()) {
+                                if (
+                                        webView != null
+                                                &&
+                                        webView.canGoBack()
+                                ) {
 
                                     webView.goBack();
 
@@ -647,6 +953,12 @@ public class MainActivity extends AppCompatActivity {
                         }
                 );
     }
+
+    /*
+     * ============================================================
+     * PERMISSION RESULT
+     * ============================================================
+     */
 
     @Override
     public void onRequestPermissionsResult(
@@ -661,9 +973,17 @@ public class MainActivity extends AppCompatActivity {
                 grantResults
         );
 
-        if (requestCode == LOCATION_REQUEST) {
+        /*
+         * LOCATION
+         */
+        if (
+                requestCode ==
+                        LOCATION_REQUEST
+        ) {
 
-            if (hasLocationPermission()) {
+            if (
+                    hasLocationPermission()
+            ) {
 
                 Toast.makeText(
                         this,
@@ -685,20 +1005,42 @@ public class MainActivity extends AppCompatActivity {
             }
         }
 
-        if (requestCode == BACKGROUND_LOCATION_REQUEST) {
+        /*
+         * BACKGROUND LOCATION
+         */
+        if (
+                requestCode ==
+                        BACKGROUND_LOCATION_REQUEST
+        ) {
 
-            if (hasLocationPermission()) {
+            if (
+                    hasLocationPermission()
+            ) {
 
                 syncSessionAndTracking();
             }
         }
 
-        if (requestCode == NOTIFICATION_REQUEST) {
+        /*
+         * NOTIFICATION
+         */
+        if (
+                requestCode ==
+                        NOTIFICATION_REQUEST
+        ) {
 
-            if (ContextCompat.checkSelfPermission(
-                    this,
-                    Manifest.permission.POST_NOTIFICATIONS
-            ) == PackageManager.PERMISSION_GRANTED) {
+            if (
+                    Build.VERSION.SDK_INT <
+                            Build.VERSION_CODES.TIRAMISU
+                            ||
+                    ContextCompat.checkSelfPermission(
+                            this,
+                            Manifest.permission
+                                    .POST_NOTIFICATIONS
+                    )
+                    ==
+                    PackageManager.PERMISSION_GRANTED
+            ) {
 
                 Toast.makeText(
                         this,
@@ -716,12 +1058,22 @@ public class MainActivity extends AppCompatActivity {
             }
         }
 
-        if (requestCode == CAMERA_REQUEST) {
+        /*
+         * CAMERA
+         */
+        if (
+                requestCode ==
+                        CAMERA_REQUEST
+        ) {
 
-            if (ContextCompat.checkSelfPermission(
-                    this,
-                    Manifest.permission.CAMERA
-            ) == PackageManager.PERMISSION_GRANTED) {
+            if (
+                    ContextCompat.checkSelfPermission(
+                            this,
+                            Manifest.permission.CAMERA
+                    )
+                    ==
+                    PackageManager.PERMISSION_GRANTED
+            ) {
 
                 Toast.makeText(
                         this,
@@ -730,6 +1082,7 @@ public class MainActivity extends AppCompatActivity {
                 ).show();
 
                 if (webView != null) {
+
                     webView.reload();
                 }
 
