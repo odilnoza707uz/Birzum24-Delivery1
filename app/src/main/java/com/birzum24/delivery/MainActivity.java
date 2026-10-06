@@ -6,12 +6,10 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
-import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
-import android.provider.Settings;
 import android.view.View;
 import android.webkit.CookieManager;
 import android.webkit.GeolocationPermissions;
@@ -80,11 +78,6 @@ public class MainActivity extends AppCompatActivity {
 
         destroyed = false;
 
-        /*
-         * Edge-to-edge ni o'chiramiz.
-         * WebView status bar ostiga kirib ketmasligi uchun
-         * pastdagi WindowInsets ham qo'llanadi.
-         */
         WindowCompat.setDecorFitsSystemWindows(
                 getWindow(),
                 true
@@ -135,11 +128,10 @@ public class MainActivity extends AppCompatActivity {
                 webView,
                 (view, insets) -> {
 
-                    WindowInsetsCompat.Type.InsetsType type =
-                            WindowInsetsCompat.Type.systemBars();
-
                     androidx.core.graphics.Insets systemInsets =
-                            insets.getInsets(type);
+                            insets.getInsets(
+                                    WindowInsetsCompat.Type.systemBars()
+                            );
 
                     view.setPadding(
                             0,
@@ -194,9 +186,6 @@ public class MainActivity extends AppCompatActivity {
 
         settings.setUseWideViewPort(false);
 
-        /*
-         * Cookie.
-         */
         CookieManager cookieManager =
                 CookieManager.getInstance();
 
@@ -211,9 +200,6 @@ public class MainActivity extends AppCompatActivity {
             );
         }
 
-        /*
-         * WebView client.
-         */
         webView.setWebViewClient(
                 new WebViewClient() {
 
@@ -254,17 +240,10 @@ public class MainActivity extends AppCompatActivity {
                                 url
                         );
 
-                        /*
-                         * Cookie yozilishi uchun sync.
-                         */
                         CookieManager
                                 .getInstance()
                                 .flush();
 
-                        /*
-                         * Sayt yuklangandan keyin
-                         * session/token tekshiriladi.
-                         */
                         handler.postDelayed(
                                 MainActivity.this
                                         ::syncSessionAndTracking,
@@ -280,9 +259,6 @@ public class MainActivity extends AppCompatActivity {
                 }
         );
 
-        /*
-         * Chrome client.
-         */
         webView.setWebChromeClient(
                 new WebChromeClient() {
 
@@ -322,8 +298,7 @@ public class MainActivity extends AppCompatActivity {
                             String[] resources =
                                     request.getResources();
 
-                            boolean camera =
-                                    false;
+                            boolean camera = false;
 
                             for (String resource :
                                     resources) {
@@ -333,6 +308,7 @@ public class MainActivity extends AppCompatActivity {
                                         .equals(resource)) {
 
                                     camera = true;
+
                                     break;
                                 }
                             }
@@ -424,11 +400,6 @@ public class MainActivity extends AppCompatActivity {
                                     )
                                     .apply();
 
-                            /*
-                             * Token olingan.
-                             * Sayt sessioni tayyor bo'lganda
-                             * serverga yuboriladi.
-                             */
                             syncSessionAndTracking();
                         }
                 );
@@ -454,9 +425,6 @@ public class MainActivity extends AppCompatActivity {
 
         sessionSyncRunning = true;
 
-        /*
-         * WebView cookie.
-         */
         CookieManager cookieManager =
                 CookieManager.getInstance();
 
@@ -483,10 +451,6 @@ public class MainActivity extends AppCompatActivity {
 
             sessionSyncRunning = false;
 
-            /*
-             * Sayt hali cookie bermagan bo'lishi mumkin.
-             * Keyin yana urinib ko'ramiz.
-             */
             handler.postDelayed(
                     this::syncSessionAndTracking,
                     2500
@@ -498,11 +462,6 @@ public class MainActivity extends AppCompatActivity {
         final String finalCookie =
                 cookie;
 
-        /*
-         * Native HTTP.
-         *
-         * WebView fetch ishlatilmaydi.
-         */
         new Thread(() -> {
 
             String responseText = "";
@@ -564,6 +523,7 @@ public class MainActivity extends AppCompatActivity {
                              connection.getOutputStream()) {
 
                     output.write(body);
+
                     output.flush();
                 }
 
@@ -619,9 +579,6 @@ public class MainActivity extends AppCompatActivity {
 
                 if (!finalError.isEmpty()) {
 
-                    /*
-                     * Debug uchun faqat Toast.
-                     */
                     Toast.makeText(
                             MainActivity.this,
                             "STATE XATO:\n"
@@ -681,9 +638,6 @@ public class MainActivity extends AppCompatActivity {
                                     "login"
                             );
 
-                    /*
-                     * Session ma'lumotlarini saqlaymiz.
-                     */
                     prefs.edit()
                             .putString(
                                     "cookie",
@@ -699,9 +653,6 @@ public class MainActivity extends AppCompatActivity {
                             )
                             .apply();
 
-                    /*
-                     * Faqat kuryer tizimiga kirgan bo'lsa.
-                     */
                     if (
                             "ready".equals(
                                     stage
