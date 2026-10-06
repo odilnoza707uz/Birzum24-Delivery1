@@ -1,5 +1,6 @@
 plugins {
     id 'com.android.application'
+    id 'com.google.gms.google-services'
 }
 
 android {
@@ -26,7 +27,6 @@ android {
             minifyEnabled false
             shrinkResources false
 
-            // ProGuard/R8
             proguardFiles 'proguard-rules.pro'
         }
     }
@@ -45,4 +45,8 @@ dependencies {
     implementation 'androidx.core:core:1.16.0'
 
     implementation 'androidx.webkit:webkit:1.13.0'
+
+    // Firebase
+    implementation platform('com.google.firebase:firebase-bom:34.19.0')
+    implementation 'com.google.firebase:firebase-messaging'
 }
