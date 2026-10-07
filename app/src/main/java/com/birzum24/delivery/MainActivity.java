@@ -6,7 +6,6 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
-import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
@@ -47,7 +46,7 @@ public class MainActivity extends AppCompatActivity {
     private static final String BASE_URL =
             "https://birzum.asakaedu.uz";
 
-    private static final String URL =
+    private static final String START_URL =
             BASE_URL + "/c/";
 
     private static final String STATE_URL =
@@ -63,14 +62,22 @@ public class MainActivity extends AppCompatActivity {
 
     private WebView webView;
 
+    private View rootView;
+
     private SharedPreferences prefs;
 
     private final Handler handler =
             new Handler(Looper.getMainLooper());
 
+    private boolean destroyed = false;
+
     private boolean sessionSyncRunning = false;
 
-    private boolean destroyed = false;
+    private boolean locationPermissionRequested = false;
+
+    private boolean cameraPermissionRequested = false;
+
+    private boolean notificationPermissionRequested = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -80,17 +87,20 @@ public class MainActivity extends AppCompatActivity {
         destroyed = false;
 
         /*
-         * Android 15/16 edge-to-edge holatida
-         * WebView system barlar ostiga kirib ketmasligi
-         * uchun insetlarni o'zimiz boshqaramiz.
+         * MUHIM:
+         *
+         * Android 15/16 da edge-to-edge sabab WebView
+         * status bar va navigation bar ostiga kirib ketishi mumkin.
+         *
+         * Biz system insetlarni ROOT VIEW ga beramiz.
+         * WebView'ga alohida inset berilmaydi.
          */
         WindowCompat.setDecorFitsSystemWindows(
                 getWindow(),
                 false
         );
 
-        if (Build.VERSION.SDK_INT >=
-                Build.VERSION_CODES.LOLLIPOP) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
 
             getWindow().setStatusBarColor(
                     Color.BLACK
@@ -98,6 +108,17 @@ public class MainActivity extends AppCompatActivity {
 
             getWindow().setNavigationBarColor(
                     Color.BLACK
+            );
+        }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+
+            getWindow().setStatusBarContrastEnforced(
+                    false
+            );
+
+            getWindow().setNavigationBarContrastEnforced(
+                    false
             );
         }
 
@@ -110,11 +131,43 @@ public class MainActivity extends AppCompatActivity {
                 R.layout.activity_main
         );
 
+        /*
+         * activity_main.xml ichidagi asosiy root.
+         *
+         * Agar root id "rootLayout" bo'lsa shu ishlaydi.
+         * Agar topilmasa content view ishlatiladi.
+         */
+        rootView = findViewById(
+                R.id.rootLayout
+        );
+
+        if (rootView == null) {
+
+            rootView = findViewById(
+                    android.R.id.content
+            );
+        }
+
         webView = findViewById(
                 R.id.webView
         );
 
-        setupSystemBarInsets();
+        /*
+         * System bar insetlarini ROOT ga qo'yamiz.
+         *
+         * Natijada:
+         *
+         * STATUS BAR
+         *      ↓
+         * [bo'sh/inset]
+         *      ↓
+         * WEBVIEW
+         *      ↓
+         * [bo'sh/inset]
+         *      ↓
+         * NAVIGATION BAR
+         */
+        setupSystemBars();
 
         setupWebView();
 
@@ -128,33 +181,28 @@ public class MainActivity extends AppCompatActivity {
 
         getFcmToken();
 
-        webView.loadUrl(URL);
+        if (webView != null) {
+
+            webView.loadUrl(
+                    START_URL
+            );
+        }
     }
 
-    // =========================================================
-    // SYSTEM BAR / STATUS BAR / NAVIGATION BAR
-    // =========================================================
+    /**
+     * SYSTEM BAR INSETS
+     *
+     * WebView status bar va navigation bar ostiga
+     * kirib ketmasligi uchun root view'ga inset beradi.
+     */
+    private void setupSystemBars() {
 
-    private void setupSystemBarInsets() {
-
-        if (webView == null) {
+        if (rootView == null) {
             return;
         }
 
-        /*
-         * Edge-to-edge yoqilgan.
-         *
-         * WebView ichidagi kontent:
-         *
-         * TOP    -> status bar
-         * BOTTOM -> navigation bar
-         * LEFT   -> system inset
-         * RIGHT  -> system inset
-         *
-         * ostida qolmasligi uchun padding beriladi.
-         */
         ViewCompat.setOnApplyWindowInsetsListener(
-                webView,
+                rootView,
                 (view, insets) -> {
 
                     androidx.core.graphics.Insets systemInsets =
@@ -162,10 +210,18 @@ public class MainActivity extends AppCompatActivity {
                                     WindowInsetsCompat.Type.systemBars()
                             );
 
+                    /*
+                     * Root view'ning avvalgi paddinglarini
+                     * saqlamaymiz.
+                     *
+                     * Chap/o'ng 0.
+                     * Tepada status bar balandligi.
+                     * Pastda navigation bar balandligi.
+                     */
                     view.setPadding(
-                            systemInsets.left,
+                            0,
                             systemInsets.top,
-                            systemInsets.right,
+                            0,
                             systemInsets.bottom
                     );
 
@@ -174,56 +230,129 @@ public class MainActivity extends AppCompatActivity {
         );
 
         ViewCompat.requestApplyInsets(
-                webView
+                rootView
         );
     }
 
-    // =========================================================
-    // WEBVIEW
-    // =========================================================
-
+    /**
+     * WEBVIEW
+     */
     private void setupWebView() {
+
+        if (webView == null) {
+            return;
+        }
+
+        /*
+         * WebView'ning o'ziga system bar padding bermaymiz.
+         * Padding ROOT orqali beriladi.
+         */
+        webView.setPadding(
+                0,
+                0,
+                0,
+                0
+        );
+
+        webView.setBackgroundColor(
+                Color.WHITE
+        );
 
         WebSettings settings =
                 webView.getSettings();
 
-        settings.setJavaScriptEnabled(true);
-
-        settings.setDomStorageEnabled(true);
-
-        settings.setDatabaseEnabled(true);
-
-        settings.setGeolocationEnabled(true);
-
-        settings.setAllowFileAccess(true);
-
-        settings.setAllowContentAccess(true);
-
-        settings.setJavaScriptCanOpenWindowsAutomatically(
+        /*
+         * JavaScript
+         */
+        settings.setJavaScriptEnabled(
                 true
         );
 
-        settings.setSupportMultipleWindows(false);
+        /*
+         * DOM Storage
+         */
+        settings.setDomStorageEnabled(
+                true
+        );
 
-        settings.setMediaPlaybackRequiresUserGesture(
+        /*
+         * Database
+         */
+        settings.setDatabaseEnabled(
+                true
+        );
+
+        /*
+         * Geolocation
+         */
+        settings.setGeolocationEnabled(
+                true
+        );
+
+        /*
+         * Zoom
+         */
+        settings.setSupportZoom(
                 false
         );
 
-        settings.setBuiltInZoomControls(false);
+        settings.setBuiltInZoomControls(
+                false
+        );
 
-        settings.setDisplayZoomControls(false);
-
-        settings.setLoadWithOverviewMode(false);
-
-        settings.setUseWideViewPort(false);
+        settings.setDisplayZoomControls(
+                false
+        );
 
         /*
-         * Cookie.
+         * Viewport
+         */
+        settings.setUseWideViewPort(
+                true
+        );
+
+        settings.setLoadWithOverviewMode(
+                false
+        );
+
+        /*
+         * Cache
+         */
+        settings.setCacheMode(
+                WebSettings.LOAD_DEFAULT
+        );
+
+        /*
+         * File access
+         */
+        settings.setAllowFileAccess(
+                true
+        );
+
+        settings.setAllowContentAccess(
+                true
+        );
+
+        /*
+         * Mixed content kerak emas.
+         */
+        if (Build.VERSION.SDK_INT >=
+                Build.VERSION_CODES.LOLLIPOP) {
+
+            settings.setMixedContentMode(
+                    WebSettings.MIXED_CONTENT_NEVER_ALLOW
+            );
+        }
+
+        /*
+         * Cookies
          */
         CookieManager cookieManager =
                 CookieManager.getInstance();
 
-        cookieManager.setAcceptCookie(true);
+        cookieManager.setAcceptCookie(
+                true
+        );
 
         if (Build.VERSION.SDK_INT >=
                 Build.VERSION_CODES.LOLLIPOP) {
@@ -235,7 +364,22 @@ public class MainActivity extends AppCompatActivity {
         }
 
         /*
-         * WebView client.
+         * USER AGENT
+         */
+        String userAgent =
+                settings.getUserAgentString();
+
+        if (userAgent == null ||
+                !userAgent.contains("BirZum24Delivery")) {
+
+            settings.setUserAgentString(
+                    userAgent +
+                    " BirZum24Delivery/1.0"
+            );
+        }
+
+        /*
+         * WebViewClient
          */
         webView.setWebViewClient(
                 new WebViewClient() {
@@ -246,25 +390,42 @@ public class MainActivity extends AppCompatActivity {
                             WebResourceRequest request
                     ) {
 
-                        if (
-                                request == null
-                                        ||
-                                request.getUrl() == null
-                        ) {
+                        if (request == null ||
+                                request.getUrl() == null) {
+
                             return false;
                         }
 
-                        String host =
+                        String url =
                                 request.getUrl()
-                                        .getHost();
+                                        .toString();
 
-                        if (
-                                host != null
-                                        &&
-                                host.equals(
-                                        "birzum.asakaedu.uz"
-                                )
-                        ) {
+                        /*
+                         * BirZum24 saytlarini WebView ichida
+                         * ochamiz.
+                         */
+                        if (url.startsWith(
+                                "https://birzum.asakaedu.uz"
+                        )) {
+
+                            return false;
+                        }
+
+                        /*
+                         * Boshqa HTTPS sahifalar ham
+                         * WebView ichida ochilishi mumkin.
+                         */
+                        if (url.startsWith(
+                                "https://"
+                        )) {
+
+                            return false;
+                        }
+
+                        if (url.startsWith(
+                                "http://"
+                        )) {
+
                             return false;
                         }
 
@@ -282,39 +443,108 @@ public class MainActivity extends AppCompatActivity {
                                 url
                         );
 
-                        /*
-                         * Cookie yozilishi uchun sync.
-                         */
-                        CookieManager
-                                .getInstance()
-                                .flush();
-
-                        /*
-                         * Sayt yuklangandan keyin
-                         * session/token tekshiriladi.
-                         *
-                         * Ikkita tekshiruv qoldirilgan.
-                         */
-                        handler.postDelayed(
-                                MainActivity.this
-                                        ::syncSessionAndTracking,
-                                1200
-                        );
-
-                        handler.postDelayed(
-                                MainActivity.this
-                                        ::syncSessionAndTracking,
-                                4500
-                        );
+                        syncSessionState();
                     }
                 }
         );
 
         /*
-         * Chrome client.
+         * ChromeClient:
+         *
+         * Camera
+         * Microphone
+         * Geolocation
+         * JS dialog
+         * File upload
          */
         webView.setWebChromeClient(
                 new WebChromeClient() {
+
+                    @Override
+                    public void onPermissionRequest(
+                            PermissionRequest request
+                    ) {
+
+                        runOnUiThread(() -> {
+
+                            if (request == null) {
+                                return;
+                            }
+
+                            String[] resources =
+                                    request.getResources();
+
+                            if (resources == null ||
+                                    resources.length == 0) {
+
+                                request.deny();
+
+                                return;
+                            }
+
+                            boolean camera =
+                                    false;
+
+                            boolean microphone =
+                                    false;
+
+                            for (String resource :
+                                    resources) {
+
+                                if (PermissionRequest
+                                        .RESOURCE_VIDEO_CAPTURE
+                                        .equals(resource)) {
+
+                                    camera = true;
+                                }
+
+                                if (PermissionRequest
+                                        .RESOURCE_AUDIO_CAPTURE
+                                        .equals(resource)) {
+
+                                    microphone = true;
+                                }
+                            }
+
+                            boolean cameraGranted =
+                                    ContextCompat.checkSelfPermission(
+                                            MainActivity.this,
+                                            Manifest.permission.CAMERA
+                                    ) ==
+                                    PackageManager.PERMISSION_GRANTED;
+
+                            /*
+                             * Camera permission bor bo'lsa
+                             * WebView'ga camera beramiz.
+                             */
+                            if (camera &&
+                                    cameraGranted) {
+
+                                request.grant(
+                                        resources
+                                );
+
+                                return;
+                            }
+
+                            /*
+                             * Microphone kerak bo'lsa
+                             * Android RECORD_AUDIO permission
+                             * talab qilinadi.
+                             *
+                             * Biz hozircha xavfsiz tarzda
+                             * permission bo'lmasa deny qilamiz.
+                             */
+                            if (microphone) {
+
+                                request.deny();
+
+                                return;
+                            }
+
+                            request.deny();
+                        });
+                    }
 
                     @Override
                     public void onGeolocationPermissionsShowPrompt(
@@ -322,7 +552,20 @@ public class MainActivity extends AppCompatActivity {
                             GeolocationPermissions.Callback callback
                     ) {
 
-                        if (hasLocationPermission()) {
+                        boolean granted =
+                                ContextCompat.checkSelfPermission(
+                                        MainActivity.this,
+                                        Manifest.permission.ACCESS_FINE_LOCATION
+                                ) ==
+                                PackageManager.PERMISSION_GRANTED
+                                ||
+                                ContextCompat.checkSelfPermission(
+                                        MainActivity.this,
+                                        Manifest.permission.ACCESS_COARSE_LOCATION
+                                ) ==
+                                PackageManager.PERMISSION_GRANTED;
+
+                        if (granted) {
 
                             callback.invoke(
                                     origin,
@@ -332,8 +575,6 @@ public class MainActivity extends AppCompatActivity {
 
                         } else {
 
-                            requestLocationPermission();
-
                             callback.invoke(
                                     origin,
                                     false,
@@ -341,844 +582,120 @@ public class MainActivity extends AppCompatActivity {
                             );
                         }
                     }
-
-                    @Override
-                    public void onPermissionRequest(
-                            PermissionRequest request
-                    ) {
-
-                        runOnUiThread(() -> {
-
-                            String[] resources =
-                                    request.getResources();
-
-                            boolean camera =
-                                    false;
-
-                            for (
-                                    String resource :
-                                    resources
-                            ) {
-
-                                if (
-                                        PermissionRequest
-                                                .RESOURCE_VIDEO_CAPTURE
-                                                .equals(resource)
-                                ) {
-
-                                    camera = true;
-
-                                    break;
-                                }
-                            }
-
-                            if (!camera) {
-
-                                request.grant(
-                                        resources
-                                );
-
-                                return;
-                            }
-
-                            if (
-                                    ContextCompat
-                                            .checkSelfPermission(
-                                                    MainActivity.this,
-                                                    Manifest.permission.CAMERA
-                                            )
-                                            ==
-                                            PackageManager.PERMISSION_GRANTED
-                            ) {
-
-                                request.grant(
-                                        resources
-                                );
-
-                            } else {
-
-                                requestCameraPermission();
-                            }
-                        });
-                    }
                 }
+        );
+
+        /*
+         * Long click / selection odatda kerak emas.
+         */
+        webView.setOnLongClickListener(
+                v -> false
+        );
+
+        /*
+         * Focus.
+         */
+        webView.setFocusable(
+                true
+        );
+
+        webView.setFocusableInTouchMode(
+                true
         );
     }
 
-    // =========================================================
-    // FCM TOKEN
-    // =========================================================
+    /**
+     * BACK BUTTON
+     */
+    private void setupBackButton() {
 
-    private void getFcmToken() {
+        getOnBackPressedDispatcher()
+                .addCallback(
+                        this,
+                        new OnBackPressedCallback(true) {
 
-        FirebaseMessaging
-                .getInstance()
-                .getToken()
-                .addOnCompleteListener(
-                        task -> {
+                            @Override
+                            public void handleOnBackPressed() {
 
-                            if (!task.isSuccessful()) {
+                                if (webView != null &&
+                                        webView.canGoBack()) {
 
-                                String error =
-                                        task.getException() != null
-                                                ? task.getException()
-                                                        .getMessage()
-                                                : "Noma'lum Firebase xatosi";
+                                    webView.goBack();
 
-                                /*
-                                 * Token olishdagi xatoni
-                                 * foydalanuvchiga doimiy Toast qilib
-                                 * ko'rsatmaymiz.
-                                 */
-                                return;
+                                } else {
+
+                                    finish();
+                                }
                             }
-
-                            String token =
-                                    task.getResult();
-
-                            if (
-                                    token == null
-                                            ||
-                                    token.trim().isEmpty()
-                            ) {
-                                return;
-                            }
-
-                            String oldToken =
-                                    prefs.getString(
-                                            "fcm_token",
-                                            ""
-                                    );
-
-                            prefs.edit()
-                                    .putString(
-                                            "fcm_token",
-                                            token
-                                    )
-                                    .apply();
-
-                            /*
-                             * Token o'zgargan bo'lsa,
-                             * eski synced holatni bekor qilamiz.
-                             */
-                            if (!token.equals(oldToken)) {
-
-                                prefs.edit()
-                                        .remove(
-                                                "fcm_synced_token"
-                                        )
-                                        .putBoolean(
-                                                "fcm_synced",
-                                                false
-                                        )
-                                        .apply();
-                            }
-
-                            /*
-                             * Token olingan.
-                             * Sayt sessioni tayyor bo'lganda
-                             * serverga yuboriladi.
-                             */
-                            syncSessionAndTracking();
                         }
                 );
     }
 
-    // =========================================================
-    // SESSION + FCM + LOCATION
-    // =========================================================
+    /**
+     * NOTIFICATION PERMISSION
+     */
+    private void requestNotificationPermission() {
 
-    private void syncSessionAndTracking() {
-
-        if (destroyed) {
-            return;
-        }
-
-        if (sessionSyncRunning) {
-            return;
-        }
-
-        if (webView == null) {
-            return;
-        }
-
-        sessionSyncRunning = true;
-
-        /*
-         * WebView cookie.
-         */
-        CookieManager cookieManager =
-                CookieManager.getInstance();
-
-        String cookie =
-                cookieManager.getCookie(
-                        BASE_URL
-                );
-
-        if (
-                cookie == null
-                        ||
-                cookie.trim().isEmpty()
-        ) {
-
-            cookie =
-                    cookieManager.getCookie(
-                            URL
-                    );
-        }
-
-        if (
-                cookie == null
-                        ||
-                cookie.trim().isEmpty()
-        ) {
-
-            sessionSyncRunning = false;
-
-            /*
-             * Sayt hali cookie bermagan bo'lishi mumkin.
-             * Keyin yana urinib ko'ramiz.
-             */
-            handler.postDelayed(
-                    this::syncSessionAndTracking,
-                    2500
-            );
+        if (Build.VERSION.SDK_INT <
+                Build.VERSION_CODES.TIRAMISU) {
 
             return;
         }
 
-        final String finalCookie =
-                cookie;
-
-        /*
-         * Native HTTP.
-         *
-         * WebView fetch ishlatilmaydi.
-         */
-        new Thread(() -> {
-
-            String responseText = "";
-
-            int httpCode = 0;
-
-            String error = "";
-
-            try {
-
-                HttpURLConnection connection =
-                        (HttpURLConnection)
-                                new URL(
-                                        STATE_URL
-                                ).openConnection();
-
-                connection.setRequestMethod(
-                        "POST"
-                );
-
-                connection.setConnectTimeout(
-                        15000
-                );
-
-                connection.setReadTimeout(
-                        15000
-                );
-
-                connection.setDoOutput(
-                        true
-                );
-
-                connection.setRequestProperty(
-                        "Cookie",
-                        finalCookie
-                );
-
-                connection.setRequestProperty(
-                        "Content-Type",
-                        "application/json; charset=UTF-8"
-                );
-
-                connection.setRequestProperty(
-                        "Accept",
-                        "application/json"
-                );
-
-                connection.setRequestProperty(
-                        "User-Agent",
-                        "BirZum24-Delivery-Android"
-                );
-
-                byte[] body =
-                        "{}".getBytes(
-                                StandardCharsets.UTF_8
-                        );
-
-                try (
-                        OutputStream output =
-                                connection.getOutputStream()
-                ) {
-
-                    output.write(body);
-
-                    output.flush();
-                }
-
-                httpCode =
-                        connection.getResponseCode();
-
-                InputStream stream;
-
-                if (
-                        httpCode >= 200
-                                &&
-                        httpCode < 400
-                ) {
-
-                    stream =
-                            connection.getInputStream();
-
-                } else {
-
-                    stream =
-                            connection.getErrorStream();
-                }
-
-                if (stream != null) {
-
-                    responseText =
-                            readStream(stream);
-                }
-
-                connection.disconnect();
-
-            } catch (Exception e) {
-
-                error =
-                        e.getClass().getSimpleName()
-                                + ": "
-                                + e.getMessage();
-            }
-
-            final int finalHttpCode =
-                    httpCode;
-
-            final String finalResponse =
-                    responseText;
-
-            final String finalError =
-                    error;
-
-            runOnUiThread(() -> {
-
-                sessionSyncRunning = false;
-
-                if (destroyed) {
-                    return;
-                }
-
-                if (!finalError.isEmpty()) {
-
-                    /*
-                     * STATE xatolarini har safar Toast
-                     * qilib chiqarishni to'xtatamiz.
-                     */
-                    return;
-                }
-
-                if (finalResponse.isEmpty()) {
-                    return;
-                }
-
-                try {
-
-                    JSONObject data =
-                            new JSONObject(
-                                    finalResponse
-                            );
-
-                    boolean ok =
-                            data.optBoolean(
-                                    "ok",
-                                    false
-                            );
-
-                    if (!ok) {
-                        return;
-                    }
-
-                    String csrf =
-                            data.optString(
-                                    "csrf",
-                                    ""
-                            );
-
-                    String stage =
-                            data.optString(
-                                    "stage",
-                                    "login"
-                            );
-
-                    /*
-                     * Session ma'lumotlarini saqlaymiz.
-                     */
-                    prefs.edit()
-                            .putString(
-                                    "cookie",
-                                    finalCookie
-                            )
-                            .putString(
-                                    "csrf",
-                                    csrf
-                            )
-                            .putString(
-                                    "stage",
-                                    stage
-                            )
-                            .apply();
-
-                    /*
-                     * Faqat kuryer tizimiga kirgan bo'lsa.
-                     */
-                    if (
-                            "ready".equals(
-                                    stage
-                            )
-                    ) {
-
-                        String token =
-                                prefs.getString(
-                                        "fcm_token",
-                                        ""
-                                );
-
-                        String syncedToken =
-                                prefs.getString(
-                                        "fcm_synced_token",
-                                        ""
-                                );
-
-                        /*
-                         * Faqat hali serverga yuborilmagan
-                         * tokenni yuboramiz.
-                         */
-                        if (
-                                token != null
-                                        &&
-                                !token.trim().isEmpty()
-                                        &&
-                                csrf != null
-                                        &&
-                                !csrf.trim().isEmpty()
-                                        &&
-                                !token.equals(
-                                        syncedToken
-                                )
-                        ) {
-
-                            syncFcmTokenToServer(
-                                    finalCookie,
-                                    csrf,
-                                    token
-                            );
-                        }
-
-                        if (
-                                hasLocationPermission()
-                        ) {
-
-                            startLocationService();
-                        }
-                    }
-
-                } catch (Exception e) {
-
-                    /*
-                     * STATE JSON xatosini ham doimiy
-                     * Toast qilmaymiz.
-                     */
-                }
-            });
-
-        }).start();
-    }
-
-    // =========================================================
-    // FCM TOKEN -> PHP
-    // =========================================================
-
-    private void syncFcmTokenToServer(
-            String cookie,
-            String csrf,
-            String token
-    ) {
-
-        if (
-                cookie == null
-                        ||
-                cookie.trim().isEmpty()
-        ) {
-            return;
-        }
-
-        if (
-                csrf == null
-                        ||
-                csrf.trim().isEmpty()
-        ) {
-            return;
-        }
-
-        if (
-                token == null
-                        ||
-                token.trim().isEmpty()
-        ) {
-            return;
-        }
-
-        /*
-         * Agar shu token aynan serverga yuborilgan bo'lsa,
-         * qayta yubormaymiz.
-         */
-        String syncedToken =
-                prefs.getString(
-                        "fcm_synced_token",
-                        ""
-                );
-
-        if (token.equals(syncedToken)) {
-            return;
-        }
-
-        new Thread(() -> {
-
-            String responseText = "";
-
-            int httpCode = 0;
-
-            String error = "";
-
-            try {
-
-                JSONObject body =
-                        new JSONObject();
-
-                body.put(
-                        "token",
-                        token
-                );
-
-                byte[] bodyBytes =
-                        body.toString()
-                                .getBytes(
-                                        StandardCharsets.UTF_8
-                                );
-
-                HttpURLConnection connection =
-                        (HttpURLConnection)
-                                new URL(
-                                        FCM_URL
-                                ).openConnection();
-
-                connection.setRequestMethod(
-                        "POST"
-                );
-
-                connection.setConnectTimeout(
-                        15000
-                );
-
-                connection.setReadTimeout(
-                        15000
-                );
-
-                connection.setDoOutput(
-                        true
-                );
-
-                connection.setRequestProperty(
-                        "Cookie",
-                        cookie
-                );
-
-                connection.setRequestProperty(
-                        "X-CSRF-Token",
-                        csrf
-                );
-
-                connection.setRequestProperty(
-                        "Content-Type",
-                        "application/json; charset=UTF-8"
-                );
-
-                connection.setRequestProperty(
-                        "Accept",
-                        "application/json"
-                );
-
-                connection.setRequestProperty(
-                        "User-Agent",
-                        "BirZum24-Delivery-Android"
-                );
-
-                try (
-                        OutputStream output =
-                                connection.getOutputStream()
-                ) {
-
-                    output.write(
-                            bodyBytes
-                    );
-
-                    output.flush();
-                }
-
-                httpCode =
-                        connection.getResponseCode();
-
-                InputStream stream;
-
-                if (
-                        httpCode >= 200
-                                &&
-                        httpCode < 400
-                ) {
-
-                    stream =
-                            connection.getInputStream();
-
-                } else {
-
-                    stream =
-                            connection.getErrorStream();
-                }
-
-                if (stream != null) {
-
-                    responseText =
-                            readStream(stream);
-                }
-
-                connection.disconnect();
-
-            } catch (Exception e) {
-
-                error =
-                        e.getClass().getSimpleName()
-                                + ": "
-                                + e.getMessage();
-            }
-
-            final int finalHttpCode =
-                    httpCode;
-
-            final String finalResponse =
-                    responseText;
-
-            final String finalError =
-                    error;
-
-            runOnUiThread(() -> {
-
-                if (destroyed) {
-                    return;
-                }
-
-                if (!finalError.isEmpty()) {
-
-                    Toast.makeText(
-                            MainActivity.this,
-                            "FCM SERVER XATO:\n"
-                                    + finalError,
-                            Toast.LENGTH_LONG
-                    ).show();
-
-                    return;
-                }
-
-                if (finalResponse.isEmpty()) {
-
-                    Toast.makeText(
-                            MainActivity.this,
-                            "FCM server javobi bo‘sh.\nHTTP "
-                                    + finalHttpCode,
-                            Toast.LENGTH_LONG
-                    ).show();
-
-                    return;
-                }
-
-                try {
-
-                    /*
-                     * Server to'g'ri JSON yuborsa:
-                     *
-                     * {"ok":true,"saved":1}
-                     *
-                     * yoki:
-                     *
-                     * {"ok":true,"saved":true}
-                     *
-                     * ishlaydi.
-                     *
-                     * Sizdagi hozirgi javobda:
-                     *
-                     * {"ok":true,'saved':1}
-                     *
-                     * bo'lsa, single quote ni ham
-                     * moslashtiramiz.
-                     */
-                    String normalizedResponse =
-                            finalResponse
-                                    .replace(
-                                            "'saved'",
-                                            "\"saved\""
-                                    );
-
-                    JSONObject json =
-                            new JSONObject(
-                                    normalizedResponse
-                            );
-
-                    boolean ok =
-                            json.optBoolean(
-                                    "ok",
-                                    false
-                            );
-
-                    boolean saved =
-                            json.optBoolean(
-                                    "saved",
-                                    false
-                            )
-                            ||
-                            json.optInt(
-                                    "saved",
-                                    0
-                            ) == 1;
-
-                    if (
-                            ok
-                                    &&
-                            saved
-                    ) {
-
-                        /*
-                         * Aynan shu token serverga
-                         * muvaffaqiyatli saqlandi.
-                         */
-                        prefs.edit()
-                                .putBoolean(
-                                        "fcm_synced",
-                                        true
-                                )
-                                .putString(
-                                        "fcm_synced_token",
-                                        token
-                                )
-                                .apply();
-
-                        /*
-                         * Endi Toastni qayta-qayta chiqarmaymiz.
-                         *
-                         * Faqat bir marta qisqa xabar.
-                         */
-                        Toast.makeText(
-                                MainActivity.this,
-                                "✅ FCM bazaga saqlandi",
-                                Toast.LENGTH_SHORT
-                        ).show();
-
-                    } else {
-
-                        /*
-                         * Haqiqatan xato bo'lsa ko'rsatamiz.
-                         */
-                        Toast.makeText(
-                                MainActivity.this,
-                                "❌ FCM bazaga saqlanmadi\n"
-                                        + finalResponse,
-                                Toast.LENGTH_LONG
-                        ).show();
-                    }
-
-                } catch (Exception e) {
-
-                    Toast.makeText(
-                            MainActivity.this,
-                            "FCM JSON XATO:\n"
-                                    + e.getMessage()
-                                    + "\n"
-                                    + finalResponse,
-                            Toast.LENGTH_LONG
-                    ).show();
-                }
-            });
-
-        }).start();
-    }
-
-    // =========================================================
-    // READ HTTP STREAM
-    // =========================================================
-
-    private String readStream(
-            InputStream stream
-    ) throws Exception {
-
-        StringBuilder result =
-                new StringBuilder();
-
-        try (
-                BufferedReader reader =
-                        new BufferedReader(
-                                new InputStreamReader(
-                                        stream,
-                                        StandardCharsets.UTF_8
-                                )
-                        )
-        ) {
-
-            String line;
-
-            while (
-                    (line = reader.readLine())
-                            != null
-            ) {
-
-                result.append(line);
-            }
-        }
-
-        return result.toString();
-    }
-
-    // =========================================================
-    // LOCATION PERMISSION
-    // =========================================================
-
-    private boolean hasLocationPermission() {
-
-        return ContextCompat.checkSelfPermission(
+        if (ContextCompat.checkSelfPermission(
                 this,
-                Manifest.permission.ACCESS_FINE_LOCATION
-        ) == PackageManager.PERMISSION_GRANTED
+                Manifest.permission.POST_NOTIFICATIONS
+        ) == PackageManager.PERMISSION_GRANTED) {
 
-                ||
+            return;
+        }
 
+        if (notificationPermissionRequested) {
+            return;
+        }
+
+        notificationPermissionRequested = true;
+
+        ActivityCompat.requestPermissions(
+                this,
+                new String[]{
+                        Manifest.permission.POST_NOTIFICATIONS
+                },
+                NOTIFICATION_REQUEST
+        );
+    }
+
+    /**
+     * LOCATION PERMISSION
+     */
+    private void requestLocationPermission() {
+
+        if (locationPermissionRequested) {
+            return;
+        }
+
+        boolean fine =
+                ContextCompat.checkSelfPermission(
+                        this,
+                        Manifest.permission.ACCESS_FINE_LOCATION
+                ) ==
+                PackageManager.PERMISSION_GRANTED;
+
+        boolean coarse =
                 ContextCompat.checkSelfPermission(
                         this,
                         Manifest.permission.ACCESS_COARSE_LOCATION
-                ) == PackageManager.PERMISSION_GRANTED;
-    }
+                ) ==
+                PackageManager.PERMISSION_GRANTED;
 
-    private void requestLocationPermission() {
+        if (fine || coarse) {
 
-        if (hasLocationPermission()) {
-
-            requestBackgroundLocation();
+            startLocationServiceIfPossible();
 
             return;
         }
+
+        locationPermissionRequested = true;
 
         ActivityCompat.requestPermissions(
                 this,
@@ -1190,115 +707,24 @@ public class MainActivity extends AppCompatActivity {
         );
     }
 
-    // =========================================================
-    // BACKGROUND LOCATION
-    // =========================================================
-
-    private void requestBackgroundLocation() {
-
-        if (
-                Build.VERSION.SDK_INT <
-                        Build.VERSION_CODES.Q
-        ) {
-            return;
-        }
-
-        if (
-                ContextCompat.checkSelfPermission(
-                        this,
-                        Manifest.permission
-                                .ACCESS_BACKGROUND_LOCATION
-                )
-                        ==
-                        PackageManager.PERMISSION_GRANTED
-        ) {
-            return;
-        }
-
-        new AlertDialog.Builder(this)
-                .setTitle(
-                        "Doimiy joylashuv"
-                )
-                .setMessage(
-                        "BirZum24 kuryer ilovasi buyurtma vaqtida joylashuvingizni fonda ham yuborishi kerak. Keyingi oynada \"Har doim ruxsat berish\"ni tanlang."
-                )
-                .setPositiveButton(
-                        "Ruxsat berish",
-                        (dialog, which) -> {
-
-                            if (
-                                    Build.VERSION.SDK_INT >=
-                                            Build.VERSION_CODES.Q
-                            ) {
-
-                                ActivityCompat
-                                        .requestPermissions(
-                                                this,
-                                                new String[]{
-                                                        Manifest.permission
-                                                                .ACCESS_BACKGROUND_LOCATION
-                                                },
-                                                BACKGROUND_LOCATION_REQUEST
-                                        );
-                            }
-                        }
-                )
-                .setNegativeButton(
-                        "Keyin",
-                        null
-                )
-                .show();
-    }
-
-    // =========================================================
-    // NOTIFICATION
-    // =========================================================
-
-    private void requestNotificationPermission() {
-
-        if (
-                Build.VERSION.SDK_INT <
-                        Build.VERSION_CODES.TIRAMISU
-        ) {
-            return;
-        }
-
-        if (
-                ContextCompat.checkSelfPermission(
-                        this,
-                        Manifest.permission.POST_NOTIFICATIONS
-                )
-                        ==
-                        PackageManager.PERMISSION_GRANTED
-        ) {
-            return;
-        }
-
-        ActivityCompat.requestPermissions(
-                this,
-                new String[]{
-                        Manifest.permission.POST_NOTIFICATIONS
-                },
-                NOTIFICATION_REQUEST
-        );
-    }
-
-    // =========================================================
-    // CAMERA
-    // =========================================================
-
+    /**
+     * CAMERA PERMISSION
+     */
     private void requestCameraPermission() {
 
-        if (
-                ContextCompat.checkSelfPermission(
-                        this,
-                        Manifest.permission.CAMERA
-                )
-                        ==
-                        PackageManager.PERMISSION_GRANTED
-        ) {
+        if (cameraPermissionRequested) {
             return;
         }
+
+        if (ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.CAMERA
+        ) == PackageManager.PERMISSION_GRANTED) {
+
+            return;
+        }
+
+        cameraPermissionRequested = true;
 
         ActivityCompat.requestPermissions(
                 this,
@@ -1309,52 +735,590 @@ public class MainActivity extends AppCompatActivity {
         );
     }
 
-    // =========================================================
-    // LOCATION FOREGROUND SERVICE
-    // =========================================================
+    /**
+     * BACKGROUND LOCATION
+     */
+    private void requestBackgroundLocationPermission() {
 
-    private void startLocationService() {
+        if (Build.VERSION.SDK_INT <
+                Build.VERSION_CODES.Q) {
+
+            startLocationServiceIfPossible();
+
+            return;
+        }
+
+        if (ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.ACCESS_BACKGROUND_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED) {
+
+            startLocationServiceIfPossible();
+
+            return;
+        }
+
+        /*
+         * Android'da background location'ni
+         * foreground permissiondan keyin so'rash kerak.
+         */
+        new Handler(
+                Looper.getMainLooper()
+        ).postDelayed(
+                () -> {
+
+                    if (isFinishing() ||
+                            isDestroyed()) {
+
+                        return;
+                    }
+
+                    ActivityCompat.requestPermissions(
+                            MainActivity.this,
+                            new String[]{
+                                    Manifest.permission
+                                            .ACCESS_BACKGROUND_LOCATION
+                            },
+                            BACKGROUND_LOCATION_REQUEST
+                    );
+
+                },
+                500
+        );
+    }
+
+    /**
+     * LOCATION SERVICE
+     */
+    private void startLocationServiceIfPossible() {
+
+        boolean fine =
+                ContextCompat.checkSelfPermission(
+                        this,
+                        Manifest.permission.ACCESS_FINE_LOCATION
+                ) ==
+                PackageManager.PERMISSION_GRANTED;
+
+        boolean coarse =
+                ContextCompat.checkSelfPermission(
+                        this,
+                        Manifest.permission.ACCESS_COARSE_LOCATION
+                ) ==
+                PackageManager.PERMISSION_GRANTED;
+
+        if (!fine && !coarse) {
+            return;
+        }
 
         try {
 
-            Intent intent =
+            Intent serviceIntent =
                     new Intent(
                             this,
                             LocationForegroundService.class
                     );
 
-            if (
-                    Build.VERSION.SDK_INT >=
-                            Build.VERSION_CODES.O
-            ) {
+            if (Build.VERSION.SDK_INT >=
+                    Build.VERSION_CODES.O) {
 
                 ContextCompat.startForegroundService(
                         this,
-                        intent
+                        serviceIntent
                 );
 
             } else {
 
                 startService(
-                        intent
+                        serviceIntent
                 );
             }
 
         } catch (Exception e) {
 
+            e.printStackTrace();
+
             Toast.makeText(
                     this,
-                    "LOCATION SERVICE XATO:\n"
-                            + e.getMessage(),
-                    Toast.LENGTH_LONG
+                    "Lokatsiya xizmati ishga tushmadi.",
+                    Toast.LENGTH_SHORT
             ).show();
         }
     }
 
-    // =========================================================
-    // PERMISSIONS RESULT
-    // =========================================================
+    /**
+     * FCM TOKEN
+     */
+    private void getFcmToken() {
 
+        FirebaseMessaging
+                .getInstance()
+                .getToken()
+                .addOnCompleteListener(
+                        task -> {
+
+                            if (!task.isSuccessful()) {
+
+                                return;
+                            }
+
+                            String token =
+                                    task.getResult();
+
+                            if (token == null ||
+                                    token.trim().isEmpty()) {
+
+                                return;
+                            }
+
+                            saveAndSyncFcmToken(
+                                    token
+                            );
+                        }
+                );
+    }
+
+    /**
+     * TOKENNI LOCAL SAQLASH VA SERVERGA YUBORISH
+     */
+    private void saveAndSyncFcmToken(
+            String token
+    ) {
+
+        if (token == null ||
+                token.trim().isEmpty()) {
+
+            return;
+        }
+
+        token = token.trim();
+
+        String oldToken =
+                prefs.getString(
+                        "fcm_token",
+                        ""
+                );
+
+        String syncedToken =
+                prefs.getString(
+                        "fcm_synced_token",
+                        ""
+                );
+
+        prefs.edit()
+                .putString(
+                        "fcm_token",
+                        token
+                )
+                .apply();
+
+        /*
+         * Shu token oldin serverga saqlangan bo'lsa
+         * qayta yubormaymiz.
+         */
+        if (token.equals(
+                syncedToken
+        )) {
+
+            return;
+        }
+
+        /*
+         * Agar token o'zgarmagan bo'lsa ham
+         * serverga bir marta tekshiramiz.
+         */
+        if (sessionSyncRunning) {
+            return;
+        }
+
+        syncFcmTokenToServer(
+                token
+        );
+    }
+
+    /**
+     * FCM TOKEN -> PHP API
+     */
+    private void syncFcmTokenToServer(
+            String token
+    ) {
+
+        if (token == null ||
+                token.trim().isEmpty()) {
+
+            return;
+        }
+
+        if (sessionSyncRunning) {
+            return;
+        }
+
+        sessionSyncRunning = true;
+
+        final String finalToken =
+                token.trim();
+
+        new Thread(
+                () -> {
+
+                    HttpURLConnection connection =
+                            null;
+
+                    try {
+
+                        URL url =
+                                new URL(
+                                        FCM_URL
+                                );
+
+                        connection =
+                                (HttpURLConnection)
+                                        url.openConnection();
+
+                        connection.setRequestMethod(
+                                "POST"
+                        );
+
+                        connection.setConnectTimeout(
+                                15000
+                        );
+
+                        connection.setReadTimeout(
+                                15000
+                        );
+
+                        connection.setDoOutput(
+                                true
+                        );
+
+                        connection.setRequestProperty(
+                                "Content-Type",
+                                "application/json; charset=UTF-8"
+                        );
+
+                        connection.setRequestProperty(
+                                "Accept",
+                                "application/json"
+                        );
+
+                        /*
+                         * CSRF token.
+                         *
+                         * Agar sayt session cookie bilan
+                         * ishlayotgan bo'lsa cookie yuboramiz.
+                         */
+                        String cookies =
+                                CookieManager
+                                        .getInstance()
+                                        .getCookie(
+                                                BASE_URL
+                                        );
+
+                        if (cookies != null &&
+                                !cookies.isEmpty()) {
+
+                            connection.setRequestProperty(
+                                    "Cookie",
+                                    cookies
+                            );
+                        }
+
+                        JSONObject json =
+                                new JSONObject();
+
+                        json.put(
+                                "token",
+                                finalToken
+                        );
+
+                        byte[] body =
+                                json.toString()
+                                        .getBytes(
+                                                StandardCharsets.UTF_8
+                                        );
+
+                        OutputStream output =
+                                connection.getOutputStream();
+
+                        output.write(
+                                body
+                        );
+
+                        output.flush();
+                        output.close();
+
+                        int responseCode =
+                                connection.getResponseCode();
+
+                        InputStream stream;
+
+                        if (responseCode >= 200 &&
+                                responseCode < 400) {
+
+                            stream =
+                                    connection.getInputStream();
+
+                        } else {
+
+                            stream =
+                                    connection.getErrorStream();
+                        }
+
+                        String response =
+                                readStream(
+                                        stream
+                                );
+
+                        final String finalResponse =
+                                response == null
+                                        ? ""
+                                        : response;
+
+                        runOnUiThread(
+                                () -> {
+
+                                    sessionSyncRunning =
+                                            false;
+
+                                    try {
+
+                                        /*
+                                         * Server odatda:
+                                         *
+                                         * {"ok":true,"saved":true}
+                                         *
+                                         * bo'lishi kerak.
+                                         */
+                                        String normalizedResponse =
+                                                finalResponse
+                                                        .replace(
+                                                                "'saved'",
+                                                                "\"saved\""
+                                                        );
+
+                                        JSONObject result =
+                                                new JSONObject(
+                                                        normalizedResponse
+                                                );
+
+                                        boolean ok =
+                                                result.optBoolean(
+                                                        "ok",
+                                                        false
+                                                );
+
+                                        boolean saved =
+                                                result.optBoolean(
+                                                        "saved",
+                                                        false
+                                                )
+                                                ||
+                                                result.optInt(
+                                                        "saved",
+                                                        0
+                                                ) == 1;
+
+                                        if (ok && saved) {
+
+                                            prefs.edit()
+                                                    .putString(
+                                                            "fcm_synced_token",
+                                                            finalToken
+                                                    )
+                                                    .apply();
+
+                                        }
+
+                                    } catch (Exception e) {
+
+                                        e.printStackTrace();
+                                    }
+                                }
+                        );
+
+                    } catch (Exception e) {
+
+                        e.printStackTrace();
+
+                        runOnUiThread(
+                                () -> {
+
+                                    sessionSyncRunning =
+                                            false;
+                                }
+                        );
+
+                    } finally {
+
+                        if (connection != null) {
+
+                            connection.disconnect();
+                        }
+                    }
+
+                }
+        ).start();
+    }
+
+    /**
+     * SESSION HOLATINI SERVERDAN TEKSHIRISH
+     */
+    private void syncSessionState() {
+
+        if (destroyed) {
+            return;
+        }
+
+        /*
+         * Faqat web sahifa yuklanganda tekshiramiz.
+         */
+        new Thread(
+                () -> {
+
+                    HttpURLConnection connection =
+                            null;
+
+                    try {
+
+                        URL url =
+                                new URL(
+                                        STATE_URL
+                                );
+
+                        connection =
+                                (HttpURLConnection)
+                                        url.openConnection();
+
+                        connection.setRequestMethod(
+                                "GET"
+                        );
+
+                        connection.setConnectTimeout(
+                                10000
+                        );
+
+                        connection.setReadTimeout(
+                                10000
+                        );
+
+                        /*
+                         * WebView cookie.
+                         */
+                        String cookies =
+                                CookieManager
+                                        .getInstance()
+                                        .getCookie(
+                                                BASE_URL
+                                        );
+
+                        if (cookies != null &&
+                                !cookies.isEmpty()) {
+
+                            connection.setRequestProperty(
+                                    "Cookie",
+                                    cookies
+                            );
+                        }
+
+                        int responseCode =
+                                connection.getResponseCode();
+
+                        if (responseCode >= 200 &&
+                                responseCode < 400) {
+
+                            InputStream stream =
+                                    connection.getInputStream();
+
+                            String response =
+                                    readStream(
+                                            stream
+                                    );
+
+                            if (response != null &&
+                                    !response.isEmpty()) {
+
+                                try {
+
+                                    JSONObject json =
+                                            new JSONObject(
+                                                    response
+                                            );
+
+                                    /*
+                                     * Bu yerda session holatini
+                                     * kerak bo'lsa keyinchalik
+                                     * ishlatish mumkin.
+                                     */
+
+                                } catch (Exception ignored) {
+                                }
+                            }
+                        }
+
+                    } catch (Exception e) {
+
+                        e.printStackTrace();
+
+                    } finally {
+
+                        if (connection != null) {
+
+                            connection.disconnect();
+                        }
+                    }
+
+                }
+        ).start();
+    }
+
+    /**
+     * INPUT STREAM -> STRING
+     */
+    private String readStream(
+            InputStream inputStream
+    ) {
+
+        if (inputStream == null) {
+            return "";
+        }
+
+        StringBuilder builder =
+                new StringBuilder();
+
+        try {
+
+            BufferedReader reader =
+                    new BufferedReader(
+                            new InputStreamReader(
+                                    inputStream,
+                                    StandardCharsets.UTF_8
+                            )
+                    );
+
+            String line;
+
+            while (
+                    (line = reader.readLine())
+                            != null
+            ) {
+
+                builder.append(
+                        line
+                );
+            }
+
+            reader.close();
+
+        } catch (Exception e) {
+
+            e.printStackTrace();
+        }
+
+        return builder.toString();
+    }
+
+    /**
+     * PERMISSION CALLBACK
+     */
     @Override
     public void onRequestPermissionsResult(
             int requestCode,
@@ -1368,150 +1332,111 @@ public class MainActivity extends AppCompatActivity {
                 grantResults
         );
 
-        if (
-                requestCode ==
-                        LOCATION_REQUEST
-        ) {
+        if (requestCode ==
+                LOCATION_REQUEST) {
 
-            if (hasLocationPermission()) {
+            boolean granted =
+                    false;
 
-                requestBackgroundLocation();
+            if (grantResults != null) {
 
-                syncSessionAndTracking();
+                for (int result :
+                        grantResults) {
 
-            } else {
+                    if (result ==
+                            PackageManager.PERMISSION_GRANTED) {
 
-                Toast.makeText(
-                        this,
-                        "Joylashuv ruxsati berilmadi",
-                        Toast.LENGTH_LONG
-                ).show();
-            }
+                        granted = true;
 
-            return;
-        }
-
-        if (
-                requestCode ==
-                        BACKGROUND_LOCATION_REQUEST
-        ) {
-
-            if (hasLocationPermission()) {
-
-                startLocationService();
-            }
-
-            syncSessionAndTracking();
-
-            return;
-        }
-
-        if (
-                requestCode ==
-                        NOTIFICATION_REQUEST
-        ) {
-
-            if (
-                    Build.VERSION.SDK_INT >=
-                            Build.VERSION_CODES.TIRAMISU
-            ) {
-
-                if (
-                        ContextCompat.checkSelfPermission(
-                                this,
-                                Manifest.permission
-                                        .POST_NOTIFICATIONS
-                        )
-                                ==
-                                PackageManager.PERMISSION_GRANTED
-                ) {
-
-                    Toast.makeText(
-                            this,
-                            "Bildirishnoma ruxsati berildi",
-                            Toast.LENGTH_SHORT
-                    ).show();
-
-                } else {
-
-                    Toast.makeText(
-                            this,
-                            "Bildirishnoma ruxsati berilmadi",
-                            Toast.LENGTH_LONG
-                    ).show();
+                        break;
+                    }
                 }
             }
 
-            return;
-        }
+            if (granted) {
 
-        if (
-                requestCode ==
-                        CAMERA_REQUEST
-        ) {
+                startLocationServiceIfPossible();
 
-            if (
-                    grantResults.length > 0
-                            &&
-                    grantResults[0]
-                            ==
-                            PackageManager.PERMISSION_GRANTED
-            ) {
+                /*
+                 * Android 10+ background location.
+                 */
+                if (Build.VERSION.SDK_INT >=
+                        Build.VERSION_CODES.Q) {
 
-                Toast.makeText(
-                        this,
-                        "Kamera ruxsati berildi",
-                        Toast.LENGTH_SHORT
-                ).show();
+                    requestBackgroundLocationPermission();
+
+                }
 
             } else {
 
                 Toast.makeText(
                         this,
-                        "Kamera ruxsati berilmadi",
+                        "Yetkazib beruvchi lokatsiyasi uchun joylashuv ruxsati kerak.",
                         Toast.LENGTH_LONG
                 ).show();
             }
+
+            return;
+        }
+
+        if (requestCode ==
+                BACKGROUND_LOCATION_REQUEST) {
+
+            /*
+             * Background location berilgan yoki berilmaganidan
+             * qat'i nazar foreground location service ishlashi mumkin.
+             */
+            startLocationServiceIfPossible();
+
+            return;
+        }
+
+        if (requestCode ==
+                CAMERA_REQUEST) {
+
+            boolean granted =
+                    grantResults != null &&
+                    grantResults.length > 0 &&
+                    grantResults[0] ==
+                            PackageManager.PERMISSION_GRANTED;
+
+            if (!granted) {
+
+                Toast.makeText(
+                        this,
+                        "Kamera ruxsati berilmadi.",
+                        Toast.LENGTH_SHORT
+                ).show();
+            }
+
+            return;
+        }
+
+        if (requestCode ==
+                NOTIFICATION_REQUEST) {
+
+            boolean granted =
+                    grantResults != null &&
+                    grantResults.length > 0 &&
+                    grantResults[0] ==
+                            PackageManager.PERMISSION_GRANTED;
+
+            if (!granted) {
+
+                Toast.makeText(
+                        this,
+                        "Bildirishnoma ruxsati berilmadi. Yangi buyurtmalar haqida xabar kelmasligi mumkin.",
+                        Toast.LENGTH_LONG
+                ).show();
+            }
+
+            return;
         }
     }
 
-    // =========================================================
-    // BACK BUTTON
-    // =========================================================
-
-    private void setupBackButton() {
-
-        getOnBackPressedDispatcher()
-                .addCallback(
-                        this,
-                        new OnBackPressedCallback(
-                                true
-                        ) {
-
-                            @Override
-                            public void handleOnBackPressed() {
-
-                                if (
-                                        webView != null
-                                                &&
-                                        webView.canGoBack()
-                                ) {
-
-                                    webView.goBack();
-
-                                } else {
-
-                                    finish();
-                                }
-                            }
-                        }
-                );
-    }
-
-    // =========================================================
-    // RESUME
-    // =========================================================
-
+    /**
+     * ACTIVITY RESUME
+     */
     @Override
     protected void onResume() {
 
@@ -1519,37 +1444,52 @@ public class MainActivity extends AppCompatActivity {
 
         destroyed = false;
 
-        if (webView != null) {
+        /*
+         * FCM tokenni yana tekshiramiz.
+         */
+        getFcmToken();
 
-            handler.postDelayed(
-                    this::syncSessionAndTracking,
-                    1000
-            );
-        }
+        /*
+         * Location service qayta ishga tushishi mumkin.
+         */
+        startLocationServiceIfPossible();
+
+        /*
+         * WebViewni yangilamaymiz.
+         * Foydalanuvchining hozirgi sahifasi saqlanadi.
+         */
     }
 
-    // =========================================================
-    // DESTROY
-    // =========================================================
+    /**
+     * ACTIVITY PAUSE
+     */
+    @Override
+    protected void onPause() {
 
+        super.onPause();
+
+        /*
+         * Location service to'xtatilmaydi.
+         */
+    }
+
+    /**
+     * ACTIVITY DESTROY
+     */
     @Override
     protected void onDestroy() {
 
         destroyed = true;
 
-        handler.removeCallbacksAndMessages(
-                null
-        );
-
         if (webView != null) {
 
             webView.stopLoading();
 
-            webView.setWebChromeClient(
+            webView.setWebViewClient(
                     null
             );
 
-            webView.setWebViewClient(
+            webView.setWebChromeClient(
                     null
             );
 
@@ -1557,6 +1497,10 @@ public class MainActivity extends AppCompatActivity {
 
             webView = null;
         }
+
+        handler.removeCallbacksAndMessages(
+                null
+        );
 
         super.onDestroy();
     }
