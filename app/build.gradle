@@ -38,13 +38,15 @@ android {
 }
 
 dependencies {
+
+    // AndroidX
     implementation 'androidx.appcompat:appcompat:1.7.1'
-
     implementation 'androidx.activity:activity:1.10.1'
-
     implementation 'androidx.core:core:1.16.0'
-
     implementation 'androidx.webkit:webkit:1.13.0'
+
+    // Google Location / GPS
+    implementation 'com.google.android.gms:play-services-location:21.3.0'
 
     // Firebase
     implementation platform('com.google.firebase:firebase-bom:34.19.0')
