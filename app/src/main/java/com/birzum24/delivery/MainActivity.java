@@ -1,7 +1,6 @@
 package com.birzum24.delivery;
 
 import android.Manifest;
-import android.app.AlertDialog;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
@@ -79,6 +78,11 @@ public class MainActivity extends AppCompatActivity {
 
     private boolean notificationPermissionRequested = false;
 
+
+    // ============================================================
+    // ACTIVITY CREATE
+    // ============================================================
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
 
@@ -87,20 +91,18 @@ public class MainActivity extends AppCompatActivity {
         destroyed = false;
 
         /*
-         * MUHIM:
+         * Android 15/16 edge-to-edge.
          *
-         * Android 15/16 da edge-to-edge sabab WebView
-         * status bar va navigation bar ostiga kirib ketishi mumkin.
-         *
-         * Biz system insetlarni ROOT VIEW ga beramiz.
-         * WebView'ga alohida inset berilmaydi.
+         * System bar insetlarini rootLayout'ga beramiz.
+         * WebView'ning o'ziga inset bermaymiz.
          */
         WindowCompat.setDecorFitsSystemWindows(
                 getWindow(),
                 false
         );
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+        if (Build.VERSION.SDK_INT >=
+                Build.VERSION_CODES.LOLLIPOP) {
 
             getWindow().setStatusBarColor(
                     Color.BLACK
@@ -111,7 +113,8 @@ public class MainActivity extends AppCompatActivity {
             );
         }
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+        if (Build.VERSION.SDK_INT >=
+                Build.VERSION_CODES.Q) {
 
             getWindow().setStatusBarContrastEnforced(
                     false
@@ -132,41 +135,44 @@ public class MainActivity extends AppCompatActivity {
         );
 
         /*
-         * activity_main.xml ichidagi asosiy root.
+         * activity_main.xml:
          *
-         * Agar root id "rootLayout" bo'lsa shu ishlaydi.
-         * Agar topilmasa content view ishlatiladi.
+         * FrameLayout
+         * id = rootLayout
+         *
+         * WebView
+         * id = webView
          */
         rootView = findViewById(
                 R.id.rootLayout
         );
 
-        if (rootView == null) {
-
-            rootView = findViewById(
-                    android.R.id.content
-            );
-        }
-
         webView = findViewById(
                 R.id.webView
         );
 
-        /*
-         * System bar insetlarini ROOT ga qo'yamiz.
-         *
-         * Natijada:
-         *
-         * STATUS BAR
-         *      ↓
-         * [bo'sh/inset]
-         *      ↓
-         * WEBVIEW
-         *      ↓
-         * [bo'sh/inset]
-         *      ↓
-         * NAVIGATION BAR
-         */
+        if (rootView == null) {
+
+            Toast.makeText(
+                    this,
+                    "rootLayout topilmadi.",
+                    Toast.LENGTH_LONG
+            ).show();
+
+            return;
+        }
+
+        if (webView == null) {
+
+            Toast.makeText(
+                    this,
+                    "WebView topilmadi.",
+                    Toast.LENGTH_LONG
+            ).show();
+
+            return;
+        }
+
         setupSystemBars();
 
         setupWebView();
@@ -181,20 +187,16 @@ public class MainActivity extends AppCompatActivity {
 
         getFcmToken();
 
-        if (webView != null) {
-
-            webView.loadUrl(
-                    START_URL
-            );
-        }
+        webView.loadUrl(
+                START_URL
+        );
     }
 
-    /**
-     * SYSTEM BAR INSETS
-     *
-     * WebView status bar va navigation bar ostiga
-     * kirib ketmasligi uchun root view'ga inset beradi.
-     */
+
+    // ============================================================
+    // SYSTEM BAR INSETS
+    // ============================================================
+
     private void setupSystemBars() {
 
         if (rootView == null) {
@@ -211,12 +213,12 @@ public class MainActivity extends AppCompatActivity {
                             );
 
                     /*
-                     * Root view'ning avvalgi paddinglarini
-                     * saqlamaymiz.
+                     * ROOT:
                      *
-                     * Chap/o'ng 0.
-                     * Tepada status bar balandligi.
-                     * Pastda navigation bar balandligi.
+                     * top    = status bar
+                     * bottom = navigation bar
+                     *
+                     * WebView esa qolgan joyni egallaydi.
                      */
                     view.setPadding(
                             0,
@@ -234,9 +236,11 @@ public class MainActivity extends AppCompatActivity {
         );
     }
 
-    /**
-     * WEBVIEW
-     */
+
+    // ============================================================
+    // WEBVIEW
+    // ============================================================
+
     private void setupWebView() {
 
         if (webView == null) {
@@ -244,8 +248,9 @@ public class MainActivity extends AppCompatActivity {
         }
 
         /*
-         * WebView'ning o'ziga system bar padding bermaymiz.
-         * Padding ROOT orqali beriladi.
+         * System inset ROOT'da.
+         *
+         * WebView'ga alohida padding bermaymiz.
          */
         webView.setPadding(
                 0,
@@ -261,37 +266,60 @@ public class MainActivity extends AppCompatActivity {
         WebSettings settings =
                 webView.getSettings();
 
-        /*
-         * JavaScript
-         */
+
+        // --------------------------------------------------------
+        // JAVASCRIPT
+        // --------------------------------------------------------
+
         settings.setJavaScriptEnabled(
                 true
         );
 
-        /*
-         * DOM Storage
-         */
+
+        // --------------------------------------------------------
+        // DOM STORAGE
+        // --------------------------------------------------------
+
         settings.setDomStorageEnabled(
                 true
         );
 
-        /*
-         * Database
-         */
+
+        // --------------------------------------------------------
+        // DATABASE
+        // --------------------------------------------------------
+
         settings.setDatabaseEnabled(
                 true
         );
 
-        /*
-         * Geolocation
-         */
+
+        // --------------------------------------------------------
+        // GEOLOCATION
+        // --------------------------------------------------------
+
         settings.setGeolocationEnabled(
                 true
         );
 
-        /*
-         * Zoom
-         */
+
+        // --------------------------------------------------------
+        // VIEWPORT
+        // --------------------------------------------------------
+
+        settings.setUseWideViewPort(
+                true
+        );
+
+        settings.setLoadWithOverviewMode(
+                false
+        );
+
+
+        // --------------------------------------------------------
+        // ZOOM
+        // --------------------------------------------------------
+
         settings.setSupportZoom(
                 false
         );
@@ -304,27 +332,20 @@ public class MainActivity extends AppCompatActivity {
                 false
         );
 
-        /*
-         * Viewport
-         */
-        settings.setUseWideViewPort(
-                true
-        );
 
-        settings.setLoadWithOverviewMode(
-                false
-        );
+        // --------------------------------------------------------
+        // CACHE
+        // --------------------------------------------------------
 
-        /*
-         * Cache
-         */
         settings.setCacheMode(
                 WebSettings.LOAD_DEFAULT
         );
 
-        /*
-         * File access
-         */
+
+        // --------------------------------------------------------
+        // FILE ACCESS
+        // --------------------------------------------------------
+
         settings.setAllowFileAccess(
                 true
         );
@@ -333,9 +354,11 @@ public class MainActivity extends AppCompatActivity {
                 true
         );
 
-        /*
-         * Mixed content kerak emas.
-         */
+
+        // --------------------------------------------------------
+        // MIXED CONTENT
+        // --------------------------------------------------------
+
         if (Build.VERSION.SDK_INT >=
                 Build.VERSION_CODES.LOLLIPOP) {
 
@@ -344,9 +367,11 @@ public class MainActivity extends AppCompatActivity {
             );
         }
 
-        /*
-         * Cookies
-         */
+
+        // --------------------------------------------------------
+        // COOKIES
+        // --------------------------------------------------------
+
         CookieManager cookieManager =
                 CookieManager.getInstance();
 
@@ -363,14 +388,18 @@ public class MainActivity extends AppCompatActivity {
             );
         }
 
-        /*
-         * USER AGENT
-         */
+
+        // --------------------------------------------------------
+        // USER AGENT
+        // --------------------------------------------------------
+
         String userAgent =
                 settings.getUserAgentString();
 
-        if (userAgent == null ||
-                !userAgent.contains("BirZum24Delivery")) {
+        if (userAgent != null &&
+                !userAgent.contains(
+                        "BirZum24Delivery"
+                )) {
 
             settings.setUserAgentString(
                     userAgent +
@@ -378,9 +407,11 @@ public class MainActivity extends AppCompatActivity {
             );
         }
 
-        /*
-         * WebViewClient
-         */
+
+        // ========================================================
+        // WEBVIEW CLIENT
+        // ========================================================
+
         webView.setWebViewClient(
                 new WebViewClient() {
 
@@ -401,8 +432,7 @@ public class MainActivity extends AppCompatActivity {
                                         .toString();
 
                         /*
-                         * BirZum24 saytlarini WebView ichida
-                         * ochamiz.
+                         * BirZum24 sayti WebView ichida.
                          */
                         if (url.startsWith(
                                 "https://birzum.asakaedu.uz"
@@ -412,8 +442,7 @@ public class MainActivity extends AppCompatActivity {
                         }
 
                         /*
-                         * Boshqa HTTPS sahifalar ham
-                         * WebView ichida ochilishi mumkin.
+                         * HTTPS.
                          */
                         if (url.startsWith(
                                 "https://"
@@ -422,6 +451,9 @@ public class MainActivity extends AppCompatActivity {
                             return false;
                         }
 
+                        /*
+                         * HTTP.
+                         */
                         if (url.startsWith(
                                 "http://"
                         )) {
@@ -431,6 +463,7 @@ public class MainActivity extends AppCompatActivity {
 
                         return false;
                     }
+
 
                     @Override
                     public void onPageFinished(
@@ -448,15 +481,11 @@ public class MainActivity extends AppCompatActivity {
                 }
         );
 
-        /*
-         * ChromeClient:
-         *
-         * Camera
-         * Microphone
-         * Geolocation
-         * JS dialog
-         * File upload
-         */
+
+        // ========================================================
+        // WEB CHROME CLIENT
+        // ========================================================
+
         webView.setWebChromeClient(
                 new WebChromeClient() {
 
@@ -465,86 +494,96 @@ public class MainActivity extends AppCompatActivity {
                             PermissionRequest request
                     ) {
 
-                        runOnUiThread(() -> {
+                        runOnUiThread(
+                                () -> {
 
-                            if (request == null) {
-                                return;
-                            }
+                                    if (request == null) {
+                                        return;
+                                    }
 
-                            String[] resources =
-                                    request.getResources();
+                                    String[] resources =
+                                            request.getResources();
 
-                            if (resources == null ||
-                                    resources.length == 0) {
+                                    if (resources == null ||
+                                            resources.length == 0) {
 
-                                request.deny();
+                                        request.deny();
 
-                                return;
-                            }
+                                        return;
+                                    }
 
-                            boolean camera =
-                                    false;
+                                    boolean camera =
+                                            false;
 
-                            boolean microphone =
-                                    false;
+                                    boolean microphone =
+                                            false;
 
-                            for (String resource :
-                                    resources) {
+                                    for (
+                                            String resource :
+                                            resources
+                                    ) {
 
-                                if (PermissionRequest
-                                        .RESOURCE_VIDEO_CAPTURE
-                                        .equals(resource)) {
+                                        if (
+                                                PermissionRequest
+                                                        .RESOURCE_VIDEO_CAPTURE
+                                                        .equals(
+                                                                resource
+                                                        )
+                                        ) {
 
-                                    camera = true;
+                                            camera = true;
+                                        }
+
+                                        if (
+                                                PermissionRequest
+                                                        .RESOURCE_AUDIO_CAPTURE
+                                                        .equals(
+                                                                resource
+                                                        )
+                                        ) {
+
+                                            microphone = true;
+                                        }
+                                    }
+
+                                    boolean cameraGranted =
+                                            ContextCompat.checkSelfPermission(
+                                                    MainActivity.this,
+                                                    Manifest.permission.CAMERA
+                                            ) ==
+                                            PackageManager.PERMISSION_GRANTED;
+
+                                    /*
+                                     * Camera ruxsati bor.
+                                     */
+                                    if (
+                                            camera &&
+                                            cameraGranted
+                                    ) {
+
+                                        request.grant(
+                                                resources
+                                        );
+
+                                        return;
+                                    }
+
+                                    /*
+                                     * Microphone uchun
+                                     * hozircha ruxsat yo'q.
+                                     */
+                                    if (microphone) {
+
+                                        request.deny();
+
+                                        return;
+                                    }
+
+                                    request.deny();
                                 }
-
-                                if (PermissionRequest
-                                        .RESOURCE_AUDIO_CAPTURE
-                                        .equals(resource)) {
-
-                                    microphone = true;
-                                }
-                            }
-
-                            boolean cameraGranted =
-                                    ContextCompat.checkSelfPermission(
-                                            MainActivity.this,
-                                            Manifest.permission.CAMERA
-                                    ) ==
-                                    PackageManager.PERMISSION_GRANTED;
-
-                            /*
-                             * Camera permission bor bo'lsa
-                             * WebView'ga camera beramiz.
-                             */
-                            if (camera &&
-                                    cameraGranted) {
-
-                                request.grant(
-                                        resources
-                                );
-
-                                return;
-                            }
-
-                            /*
-                             * Microphone kerak bo'lsa
-                             * Android RECORD_AUDIO permission
-                             * talab qilinadi.
-                             *
-                             * Biz hozircha xavfsiz tarzda
-                             * permission bo'lmasa deny qilamiz.
-                             */
-                            if (microphone) {
-
-                                request.deny();
-
-                                return;
-                            }
-
-                            request.deny();
-                        });
+                        );
                     }
+
 
                     @Override
                     public void onGeolocationPermissionsShowPrompt(
@@ -552,18 +591,22 @@ public class MainActivity extends AppCompatActivity {
                             GeolocationPermissions.Callback callback
                     ) {
 
-                        boolean granted =
+                        boolean fine =
                                 ContextCompat.checkSelfPermission(
                                         MainActivity.this,
                                         Manifest.permission.ACCESS_FINE_LOCATION
                                 ) ==
-                                PackageManager.PERMISSION_GRANTED
-                                ||
+                                PackageManager.PERMISSION_GRANTED;
+
+                        boolean coarse =
                                 ContextCompat.checkSelfPermission(
                                         MainActivity.this,
                                         Manifest.permission.ACCESS_COARSE_LOCATION
                                 ) ==
                                 PackageManager.PERMISSION_GRANTED;
+
+                        boolean granted =
+                                fine || coarse;
 
                         if (granted) {
 
@@ -585,16 +628,7 @@ public class MainActivity extends AppCompatActivity {
                 }
         );
 
-        /*
-         * Long click / selection odatda kerak emas.
-         */
-        webView.setOnLongClickListener(
-                v -> false
-        );
 
-        /*
-         * Focus.
-         */
         webView.setFocusable(
                 true
         );
@@ -602,11 +636,17 @@ public class MainActivity extends AppCompatActivity {
         webView.setFocusableInTouchMode(
                 true
         );
+
+        webView.setOverScrollMode(
+                View.OVER_SCROLL_NEVER
+        );
     }
 
-    /**
-     * BACK BUTTON
-     */
+
+    // ============================================================
+    // BACK BUTTON
+    // ============================================================
+
     private void setupBackButton() {
 
         getOnBackPressedDispatcher()
@@ -617,8 +657,10 @@ public class MainActivity extends AppCompatActivity {
                             @Override
                             public void handleOnBackPressed() {
 
-                                if (webView != null &&
-                                        webView.canGoBack()) {
+                                if (
+                                        webView != null &&
+                                        webView.canGoBack()
+                                ) {
 
                                     webView.goBack();
 
@@ -631,21 +673,28 @@ public class MainActivity extends AppCompatActivity {
                 );
     }
 
-    /**
-     * NOTIFICATION PERMISSION
-     */
+
+    // ============================================================
+    // NOTIFICATION PERMISSION
+    // ============================================================
+
     private void requestNotificationPermission() {
 
-        if (Build.VERSION.SDK_INT <
-                Build.VERSION_CODES.TIRAMISU) {
+        if (
+                Build.VERSION.SDK_INT <
+                Build.VERSION_CODES.TIRAMISU
+        ) {
 
             return;
         }
 
-        if (ContextCompat.checkSelfPermission(
-                this,
-                Manifest.permission.POST_NOTIFICATIONS
-        ) == PackageManager.PERMISSION_GRANTED) {
+        if (
+                ContextCompat.checkSelfPermission(
+                        this,
+                        Manifest.permission.POST_NOTIFICATIONS
+                ) ==
+                PackageManager.PERMISSION_GRANTED
+        ) {
 
             return;
         }
@@ -665,9 +714,11 @@ public class MainActivity extends AppCompatActivity {
         );
     }
 
-    /**
-     * LOCATION PERMISSION
-     */
+
+    // ============================================================
+    // LOCATION PERMISSION
+    // ============================================================
+
     private void requestLocationPermission() {
 
         if (locationPermissionRequested) {
@@ -707,19 +758,24 @@ public class MainActivity extends AppCompatActivity {
         );
     }
 
-    /**
-     * CAMERA PERMISSION
-     */
+
+    // ============================================================
+    // CAMERA PERMISSION
+    // ============================================================
+
     private void requestCameraPermission() {
 
         if (cameraPermissionRequested) {
             return;
         }
 
-        if (ContextCompat.checkSelfPermission(
-                this,
-                Manifest.permission.CAMERA
-        ) == PackageManager.PERMISSION_GRANTED) {
+        if (
+                ContextCompat.checkSelfPermission(
+                        this,
+                        Manifest.permission.CAMERA
+                ) ==
+                PackageManager.PERMISSION_GRANTED
+        ) {
 
             return;
         }
@@ -735,40 +791,45 @@ public class MainActivity extends AppCompatActivity {
         );
     }
 
-    /**
-     * BACKGROUND LOCATION
-     */
+
+    // ============================================================
+    // BACKGROUND LOCATION
+    // ============================================================
+
     private void requestBackgroundLocationPermission() {
 
-        if (Build.VERSION.SDK_INT <
-                Build.VERSION_CODES.Q) {
+        if (
+                Build.VERSION.SDK_INT <
+                Build.VERSION_CODES.Q
+        ) {
 
             startLocationServiceIfPossible();
 
             return;
         }
 
-        if (ContextCompat.checkSelfPermission(
-                this,
-                Manifest.permission.ACCESS_BACKGROUND_LOCATION
-        ) == PackageManager.PERMISSION_GRANTED) {
+        if (
+                ContextCompat.checkSelfPermission(
+                        this,
+                        Manifest.permission.ACCESS_BACKGROUND_LOCATION
+                ) ==
+                PackageManager.PERMISSION_GRANTED
+        ) {
 
             startLocationServiceIfPossible();
 
             return;
         }
 
-        /*
-         * Android'da background location'ni
-         * foreground permissiondan keyin so'rash kerak.
-         */
         new Handler(
                 Looper.getMainLooper()
         ).postDelayed(
                 () -> {
 
-                    if (isFinishing() ||
-                            isDestroyed()) {
+                    if (
+                            isFinishing() ||
+                            isDestroyed()
+                    ) {
 
                         return;
                     }
@@ -787,9 +848,11 @@ public class MainActivity extends AppCompatActivity {
         );
     }
 
-    /**
-     * LOCATION SERVICE
-     */
+
+    // ============================================================
+    // START LOCATION SERVICE
+    // ============================================================
+
     private void startLocationServiceIfPossible() {
 
         boolean fine =
@@ -818,8 +881,10 @@ public class MainActivity extends AppCompatActivity {
                             LocationForegroundService.class
                     );
 
-            if (Build.VERSION.SDK_INT >=
-                    Build.VERSION_CODES.O) {
+            if (
+                    Build.VERSION.SDK_INT >=
+                    Build.VERSION_CODES.O
+            ) {
 
                 ContextCompat.startForegroundService(
                         this,
@@ -845,9 +910,11 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    /**
-     * FCM TOKEN
-     */
+
+    // ============================================================
+    // FCM TOKEN
+    // ============================================================
+
     private void getFcmToken() {
 
         FirebaseMessaging
@@ -864,8 +931,10 @@ public class MainActivity extends AppCompatActivity {
                             String token =
                                     task.getResult();
 
-                            if (token == null ||
-                                    token.trim().isEmpty()) {
+                            if (
+                                    token == null ||
+                                    token.trim().isEmpty()
+                            ) {
 
                                 return;
                             }
@@ -877,26 +946,24 @@ public class MainActivity extends AppCompatActivity {
                 );
     }
 
-    /**
-     * TOKENNI LOCAL SAQLASH VA SERVERGA YUBORISH
-     */
+
+    // ============================================================
+    // SAVE FCM TOKEN
+    // ============================================================
+
     private void saveAndSyncFcmToken(
             String token
     ) {
 
-        if (token == null ||
-                token.trim().isEmpty()) {
+        if (
+                token == null ||
+                token.trim().isEmpty()
+        ) {
 
             return;
         }
 
         token = token.trim();
-
-        String oldToken =
-                prefs.getString(
-                        "fcm_token",
-                        ""
-                );
 
         String syncedToken =
                 prefs.getString(
@@ -912,20 +979,18 @@ public class MainActivity extends AppCompatActivity {
                 .apply();
 
         /*
-         * Shu token oldin serverga saqlangan bo'lsa
+         * Oldin serverga yuborilgan bo'lsa
          * qayta yubormaymiz.
          */
-        if (token.equals(
-                syncedToken
-        )) {
+        if (
+                token.equals(
+                        syncedToken
+                )
+        ) {
 
             return;
         }
 
-        /*
-         * Agar token o'zgarmagan bo'lsa ham
-         * serverga bir marta tekshiramiz.
-         */
         if (sessionSyncRunning) {
             return;
         }
@@ -935,15 +1000,19 @@ public class MainActivity extends AppCompatActivity {
         );
     }
 
-    /**
-     * FCM TOKEN -> PHP API
-     */
+
+    // ============================================================
+    // SEND FCM TOKEN TO PHP
+    // ============================================================
+
     private void syncFcmTokenToServer(
             String token
     ) {
 
-        if (token == null ||
-                token.trim().isEmpty()) {
+        if (
+                token == null ||
+                token.trim().isEmpty()
+        ) {
 
             return;
         }
@@ -1000,12 +1069,11 @@ public class MainActivity extends AppCompatActivity {
                                 "application/json"
                         );
 
-                        /*
-                         * CSRF token.
-                         *
-                         * Agar sayt session cookie bilan
-                         * ishlayotgan bo'lsa cookie yuboramiz.
-                         */
+
+                        // ------------------------------------------------
+                        // COOKIE
+                        // ------------------------------------------------
+
                         String cookies =
                                 CookieManager
                                         .getInstance()
@@ -1013,14 +1081,21 @@ public class MainActivity extends AppCompatActivity {
                                                 BASE_URL
                                         );
 
-                        if (cookies != null &&
-                                !cookies.isEmpty()) {
+                        if (
+                                cookies != null &&
+                                !cookies.isEmpty()
+                        ) {
 
                             connection.setRequestProperty(
                                     "Cookie",
                                     cookies
                             );
                         }
+
+
+                        // ------------------------------------------------
+                        // JSON
+                        // ------------------------------------------------
 
                         JSONObject json =
                                 new JSONObject();
@@ -1036,6 +1111,7 @@ public class MainActivity extends AppCompatActivity {
                                                 StandardCharsets.UTF_8
                                         );
 
+
                         OutputStream output =
                                 connection.getOutputStream();
 
@@ -1044,15 +1120,23 @@ public class MainActivity extends AppCompatActivity {
                         );
 
                         output.flush();
+
                         output.close();
+
+
+                        // ------------------------------------------------
+                        // RESPONSE
+                        // ------------------------------------------------
 
                         int responseCode =
                                 connection.getResponseCode();
 
                         InputStream stream;
 
-                        if (responseCode >= 200 &&
-                                responseCode < 400) {
+                        if (
+                                responseCode >= 200 &&
+                                responseCode < 400
+                        ) {
 
                             stream =
                                     connection.getInputStream();
@@ -1073,6 +1157,7 @@ public class MainActivity extends AppCompatActivity {
                                         ? ""
                                         : response;
 
+
                         runOnUiThread(
                                 () -> {
 
@@ -1081,23 +1166,9 @@ public class MainActivity extends AppCompatActivity {
 
                                     try {
 
-                                        /*
-                                         * Server odatda:
-                                         *
-                                         * {"ok":true,"saved":true}
-                                         *
-                                         * bo'lishi kerak.
-                                         */
-                                        String normalizedResponse =
-                                                finalResponse
-                                                        .replace(
-                                                                "'saved'",
-                                                                "\"saved\""
-                                                        );
-
                                         JSONObject result =
                                                 new JSONObject(
-                                                        normalizedResponse
+                                                        finalResponse
                                                 );
 
                                         boolean ok =
@@ -1106,6 +1177,10 @@ public class MainActivity extends AppCompatActivity {
                                                         false
                                                 );
 
+                                        /*
+                                         * PHP true yoki 1
+                                         * bo'lishi mumkin.
+                                         */
                                         boolean saved =
                                                 result.optBoolean(
                                                         "saved",
@@ -1117,7 +1192,10 @@ public class MainActivity extends AppCompatActivity {
                                                         0
                                                 ) == 1;
 
-                                        if (ok && saved) {
+                                        if (
+                                                ok &&
+                                                saved
+                                        ) {
 
                                             prefs.edit()
                                                     .putString(
@@ -1125,17 +1203,20 @@ public class MainActivity extends AppCompatActivity {
                                                             finalToken
                                                     )
                                                     .apply();
-
                                         }
 
-                                    } catch (Exception e) {
+                                    } catch (
+                                            Exception e
+                                    ) {
 
                                         e.printStackTrace();
                                     }
                                 }
                         );
 
-                    } catch (Exception e) {
+                    } catch (
+                            Exception e
+                    ) {
 
                         e.printStackTrace();
 
@@ -1159,18 +1240,17 @@ public class MainActivity extends AppCompatActivity {
         ).start();
     }
 
-    /**
-     * SESSION HOLATINI SERVERDAN TEKSHIRISH
-     */
+
+    // ============================================================
+    // SESSION STATE
+    // ============================================================
+
     private void syncSessionState() {
 
         if (destroyed) {
             return;
         }
 
-        /*
-         * Faqat web sahifa yuklanganda tekshiramiz.
-         */
         new Thread(
                 () -> {
 
@@ -1200,9 +1280,11 @@ public class MainActivity extends AppCompatActivity {
                                 10000
                         );
 
-                        /*
-                         * WebView cookie.
-                         */
+
+                        // --------------------------------------------
+                        // COOKIE
+                        // --------------------------------------------
+
                         String cookies =
                                 CookieManager
                                         .getInstance()
@@ -1210,8 +1292,10 @@ public class MainActivity extends AppCompatActivity {
                                                 BASE_URL
                                         );
 
-                        if (cookies != null &&
-                                !cookies.isEmpty()) {
+                        if (
+                                cookies != null &&
+                                !cookies.isEmpty()
+                        ) {
 
                             connection.setRequestProperty(
                                     "Cookie",
@@ -1219,11 +1303,14 @@ public class MainActivity extends AppCompatActivity {
                             );
                         }
 
+
                         int responseCode =
                                 connection.getResponseCode();
 
-                        if (responseCode >= 200 &&
-                                responseCode < 400) {
+                        if (
+                                responseCode >= 200 &&
+                                responseCode < 400
+                        ) {
 
                             InputStream stream =
                                     connection.getInputStream();
@@ -1233,28 +1320,27 @@ public class MainActivity extends AppCompatActivity {
                                             stream
                                     );
 
-                            if (response != null &&
-                                    !response.isEmpty()) {
+                            if (
+                                    response != null &&
+                                    !response.isEmpty()
+                            ) {
 
                                 try {
 
-                                    JSONObject json =
-                                            new JSONObject(
-                                                    response
-                                            );
+                                    new JSONObject(
+                                            response
+                                    );
 
-                                    /*
-                                     * Bu yerda session holatini
-                                     * kerak bo'lsa keyinchalik
-                                     * ishlatish mumkin.
-                                     */
-
-                                } catch (Exception ignored) {
+                                } catch (
+                                        Exception ignored
+                                ) {
                                 }
                             }
                         }
 
-                    } catch (Exception e) {
+                    } catch (
+                            Exception e
+                    ) {
 
                         e.printStackTrace();
 
@@ -1270,9 +1356,11 @@ public class MainActivity extends AppCompatActivity {
         ).start();
     }
 
-    /**
-     * INPUT STREAM -> STRING
-     */
+
+    // ============================================================
+    // READ INPUT STREAM
+    // ============================================================
+
     private String readStream(
             InputStream inputStream
     ) {
@@ -1308,7 +1396,9 @@ public class MainActivity extends AppCompatActivity {
 
             reader.close();
 
-        } catch (Exception e) {
+        } catch (
+                Exception e
+        ) {
 
             e.printStackTrace();
         }
@@ -1316,9 +1406,11 @@ public class MainActivity extends AppCompatActivity {
         return builder.toString();
     }
 
-    /**
-     * PERMISSION CALLBACK
-     */
+
+    // ============================================================
+    // PERMISSION RESULT
+    // ============================================================
+
     @Override
     public void onRequestPermissionsResult(
             int requestCode,
@@ -1332,19 +1424,32 @@ public class MainActivity extends AppCompatActivity {
                 grantResults
         );
 
-        if (requestCode ==
-                LOCATION_REQUEST) {
+
+        // --------------------------------------------------------
+        // LOCATION
+        // --------------------------------------------------------
+
+        if (
+                requestCode ==
+                LOCATION_REQUEST
+        ) {
 
             boolean granted =
                     false;
 
-            if (grantResults != null) {
+            if (
+                    grantResults != null
+            ) {
 
-                for (int result :
-                        grantResults) {
+                for (
+                        int result :
+                        grantResults
+                ) {
 
-                    if (result ==
-                            PackageManager.PERMISSION_GRANTED) {
+                    if (
+                            result ==
+                            PackageManager.PERMISSION_GRANTED
+                    ) {
 
                         granted = true;
 
@@ -1357,21 +1462,19 @@ public class MainActivity extends AppCompatActivity {
 
                 startLocationServiceIfPossible();
 
-                /*
-                 * Android 10+ background location.
-                 */
-                if (Build.VERSION.SDK_INT >=
-                        Build.VERSION_CODES.Q) {
+                if (
+                        Build.VERSION.SDK_INT >=
+                        Build.VERSION_CODES.Q
+                ) {
 
                     requestBackgroundLocationPermission();
-
                 }
 
             } else {
 
                 Toast.makeText(
                         this,
-                        "Yetkazib beruvchi lokatsiyasi uchun joylashuv ruxsati kerak.",
+                        "Lokatsiya ruxsati berilmadi.",
                         Toast.LENGTH_LONG
                 ).show();
             }
@@ -1379,20 +1482,30 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
 
-        if (requestCode ==
-                BACKGROUND_LOCATION_REQUEST) {
 
-            /*
-             * Background location berilgan yoki berilmaganidan
-             * qat'i nazar foreground location service ishlashi mumkin.
-             */
+        // --------------------------------------------------------
+        // BACKGROUND LOCATION
+        // --------------------------------------------------------
+
+        if (
+                requestCode ==
+                BACKGROUND_LOCATION_REQUEST
+        ) {
+
             startLocationServiceIfPossible();
 
             return;
         }
 
-        if (requestCode ==
-                CAMERA_REQUEST) {
+
+        // --------------------------------------------------------
+        // CAMERA
+        // --------------------------------------------------------
+
+        if (
+                requestCode ==
+                CAMERA_REQUEST
+        ) {
 
             boolean granted =
                     grantResults != null &&
@@ -1412,8 +1525,15 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
 
-        if (requestCode ==
-                NOTIFICATION_REQUEST) {
+
+        // --------------------------------------------------------
+        // NOTIFICATION
+        // --------------------------------------------------------
+
+        if (
+                requestCode ==
+                NOTIFICATION_REQUEST
+        ) {
 
             boolean granted =
                     grantResults != null &&
@@ -1425,7 +1545,7 @@ public class MainActivity extends AppCompatActivity {
 
                 Toast.makeText(
                         this,
-                        "Bildirishnoma ruxsati berilmadi. Yangi buyurtmalar haqida xabar kelmasligi mumkin.",
+                        "Bildirishnoma ruxsati berilmadi.",
                         Toast.LENGTH_LONG
                 ).show();
             }
@@ -1434,9 +1554,11 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    /**
-     * ACTIVITY RESUME
-     */
+
+    // ============================================================
+    // RESUME
+    // ============================================================
+
     @Override
     protected void onResume() {
 
@@ -1444,25 +1566,16 @@ public class MainActivity extends AppCompatActivity {
 
         destroyed = false;
 
-        /*
-         * FCM tokenni yana tekshiramiz.
-         */
         getFcmToken();
 
-        /*
-         * Location service qayta ishga tushishi mumkin.
-         */
         startLocationServiceIfPossible();
-
-        /*
-         * WebViewni yangilamaymiz.
-         * Foydalanuvchining hozirgi sahifasi saqlanadi.
-         */
     }
 
-    /**
-     * ACTIVITY PAUSE
-     */
+
+    // ============================================================
+    // PAUSE
+    // ============================================================
+
     @Override
     protected void onPause() {
 
@@ -1473,9 +1586,11 @@ public class MainActivity extends AppCompatActivity {
          */
     }
 
-    /**
-     * ACTIVITY DESTROY
-     */
+
+    // ============================================================
+    // DESTROY
+    // ============================================================
+
     @Override
     protected void onDestroy() {
 
