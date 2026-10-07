@@ -1,71 +1,135 @@
 <?xml version="1.0" encoding="utf-8"?>
 
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest
+    xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- Internet -->
-    <uses-permission android:name="android.permission.INTERNET" />
+    <!-- ========================================================= -->
+    <!-- INTERNET -->
+    <!-- ========================================================= -->
 
-    <!-- Location -->
-    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
-    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission
+        android:name="android.permission.INTERNET" />
 
-    <!-- Background location -->
-    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
 
-    <!-- Foreground Service -->
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <!-- ========================================================= -->
+    <!-- LOCATION -->
+    <!-- ========================================================= -->
 
-    <!-- Android 14+ location foreground service -->
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+    <uses-permission
+        android:name="android.permission.ACCESS_COARSE_LOCATION" />
 
-    <!-- Android 13+ notifications -->
-    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission
+        android:name="android.permission.ACCESS_FINE_LOCATION" />
 
-    <!-- Camera -->
-    <uses-permission android:name="android.permission.CAMERA" />
+    <!-- Android 10+ background location -->
+    <uses-permission
+        android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
 
+
+    <!-- ========================================================= -->
+    <!-- FOREGROUND LOCATION SERVICE -->
+    <!-- ========================================================= -->
+
+    <uses-permission
+        android:name="android.permission.FOREGROUND_SERVICE" />
+
+    <!-- Android 14+ -->
+    <uses-permission
+        android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+
+
+    <!-- ========================================================= -->
+    <!-- NOTIFICATIONS -->
+    <!-- ========================================================= -->
+
+    <!-- Android 13+ -->
+    <uses-permission
+        android:name="android.permission.POST_NOTIFICATIONS" />
+
+
+    <!-- ========================================================= -->
+    <!-- CAMERA -->
+    <!-- ========================================================= -->
+
+    <uses-permission
+        android:name="android.permission.CAMERA" />
+
+
+    <!-- ========================================================= -->
+    <!-- APPLICATION -->
+    <!-- ========================================================= -->
 
     <application
+
         android:allowBackup="false"
+
         android:supportsRtl="true"
+
         android:usesCleartextTraffic="false"
+
         android:label="@string/app_name"
+
         android:theme="@style/Theme.BirZum24Delivery"
+
         android:icon="@drawable/ic_launcher"
+
         android:roundIcon="@drawable/ic_launcher">
 
 
-        <!-- Main Activity -->
+        <!-- ===================================================== -->
+        <!-- MAIN ACTIVITY -->
+        <!-- ===================================================== -->
+
         <activity
+
             android:name=".MainActivity"
+
             android:exported="true"
+
             android:screenOrientation="portrait"
+
             android:resizeableActivity="true">
 
             <intent-filter>
 
-                <action android:name="android.intent.action.MAIN" />
+                <action
+                    android:name="android.intent.action.MAIN" />
 
-                <category android:name="android.intent.category.LAUNCHER" />
+                <category
+                    android:name="android.intent.category.LAUNCHER" />
 
             </intent-filter>
 
         </activity>
 
 
-        <!-- Background Location Foreground Service -->
+        <!-- ===================================================== -->
+        <!-- LOCATION FOREGROUND SERVICE -->
+        <!-- ===================================================== -->
+
         <service
+
             android:name=".LocationForegroundService"
+
             android:enabled="true"
+
             android:exported="false"
+
             android:stopWithTask="false"
+
             android:foregroundServiceType="location" />
 
 
-        <!-- Firebase Cloud Messaging -->
+        <!-- ===================================================== -->
+        <!-- FIREBASE CLOUD MESSAGING -->
+        <!-- ===================================================== -->
+
         <service
+
             android:name=".BirZumFirebaseMessagingService"
+
             android:enabled="true"
+
             android:exported="false">
 
             <intent-filter>
