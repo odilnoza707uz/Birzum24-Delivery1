@@ -4,177 +4,126 @@ import android.Manifest;
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
-import android.app.PendingIntent;
 import android.app.Service;
-import android.content.Context;
 import android.content.Intent;
-import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
-import android.location.Location;
-import android.location.LocationListener;
-import android.location.LocationManager;
 import android.os.Build;
 import android.os.IBinder;
 import android.os.Looper;
-import android.util.Log;
 
 import androidx.annotation.Nullable;
 import androidx.core.app.ActivityCompat;
 import androidx.core.app.NotificationCompat;
 
+import com.google.android.gms.location.FusedLocationProviderClient;
+import com.google.android.gms.location.LocationCallback;
+import com.google.android.gms.location.LocationRequest;
+import com.google.android.gms.location.LocationResult;
+import com.google.android.gms.location.LocationServices;
+import com.google.android.gms.location.Priority;
+
 public class LocationForegroundService extends Service {
-
-    private static final String TAG =
-            "BirZumLocationService";
-
 
     private static final String CHANNEL_ID =
             "birzum_location";
 
+    private static final int NOTIFICATION_ID = 2001;
 
-    private static final int NOTIFICATION_ID =
-            2401;
+    private FusedLocationProviderClient fusedLocationClient;
 
-
-    private LocationManager locationManager;
-
-    private LocationListener locationListener;
-
-
-    private SharedPreferences prefs;
-
+    private LocationCallback locationCallback;
 
     @Override
     public void onCreate() {
-
         super.onCreate();
 
-
-        prefs =
-                getSharedPreferences(
-                        "birzum_delivery",
-                        MODE_PRIVATE
-                );
-
-
         createNotificationChannel();
-
 
         startForeground(
                 NOTIFICATION_ID,
                 createNotification()
         );
 
+        fusedLocationClient =
+                LocationServices
+                        .getFusedLocationProviderClient(this);
 
         startLocationUpdates();
     }
 
-
-    private void createNotificationChannel() {
-
-        if (Build.VERSION.SDK_INT >=
-                Build.VERSION_CODES.O) {
-
-            NotificationChannel channel =
-                    new NotificationChannel(
-
-                            CHANNEL_ID,
-
-                            "BirZum24 joylashuv",
-
-                            NotificationManager.IMPORTANCE_LOW
-                    );
-
-
-            channel.setDescription(
-                    "Kuryer joylashuvini kuzatish"
-            );
-
-
-            channel.setShowBadge(false);
-
-
-            NotificationManager manager =
-                    getSystemService(
-                            NotificationManager.class
-                    );
-
-
-            if (manager != null) {
-
-                manager.createNotificationChannel(
-                        channel
-                );
-            }
-        }
-    }
-
-
     private Notification createNotification() {
 
-        Intent intent =
+        Intent notificationIntent =
                 new Intent(
                         this,
                         MainActivity.class
                 );
 
-
-        intent.setFlags(
-                Intent.FLAG_ACTIVITY_SINGLE_TOP
-                        |
-                        Intent.FLAG_ACTIVITY_CLEAR_TOP
-        );
-
-
-        PendingIntent pendingIntent =
-                PendingIntent.getActivity(
-
+        android.app.PendingIntent pendingIntent =
+                android.app.PendingIntent.getActivity(
                         this,
-
-                        2402,
-
-                        intent,
-
-                        PendingIntent.FLAG_UPDATE_CURRENT
-                                |
-                                PendingIntent.FLAG_IMMUTABLE
+                        0,
+                        notificationIntent,
+                        Build.VERSION.SDK_INT >= Build.VERSION_CODES.M
+                                ? android.app.PendingIntent.FLAG_IMMUTABLE
+                                : 0
                 );
-
 
         return new NotificationCompat.Builder(
                 this,
                 CHANNEL_ID
         )
-
-                .setSmallIcon(
-                        android.R.drawable.ic_menu_mylocation
-                )
-
-                .setContentTitle(
-                        "BirZum24 Delivery"
-                )
-
+                .setContentTitle("BirZum24")
                 .setContentText(
-                        "Joylashuv faol"
+                        "Kuryer joylashuvi faol ishlamoqda"
                 )
-
+                .setSmallIcon(
+                        R.drawable.ic_launcher
+                )
                 .setOngoing(true)
-
+                .setOnlyAlertOnce(true)
                 .setCategory(
                         NotificationCompat.CATEGORY_SERVICE
                 )
-
                 .setPriority(
                         NotificationCompat.PRIORITY_LOW
                 )
-
-                .setContentIntent(
-                        pendingIntent
-                )
-
+                .setContentIntent(pendingIntent)
                 .build();
     }
 
+    private void createNotificationChannel() {
+
+        if (Build.VERSION.SDK_INT <
+                Build.VERSION_CODES.O) {
+            return;
+        }
+
+        NotificationChannel channel =
+                new NotificationChannel(
+                        CHANNEL_ID,
+                        "Kuryer joylashuvi",
+                        NotificationManager.IMPORTANCE_LOW
+                );
+
+        channel.setDescription(
+                "BirZum24 kuryer joylashuvini fonda kuzatish"
+        );
+
+        channel.setShowBadge(false);
+
+        NotificationManager manager =
+                getSystemService(
+                        NotificationManager.class
+                );
+
+        if (manager != null) {
+
+            manager.createNotificationChannel(
+                    channel
+            );
+        }
+    }
 
     private void startLocationUpdates() {
 
@@ -189,177 +138,68 @@ public class LocationForegroundService extends Service {
                 ) != PackageManager.PERMISSION_GRANTED) {
 
             stopSelf();
-
             return;
         }
 
+        LocationRequest request =
+                new LocationRequest.Builder(
+                        Priority.PRIORITY_HIGH_ACCURACY,
+                        5000
+                )
+                        .setMinUpdateIntervalMillis(3000)
+                        .setMaxUpdateDelayMillis(10000)
+                        .setWaitForAccurateLocation(false)
+                        .build();
 
-        locationManager =
-                (LocationManager)
-                        getSystemService(
-                                Context.LOCATION_SERVICE
+        locationCallback =
+                new LocationCallback() {
+
+                    @Override
+                    public void onLocationResult(
+                            LocationResult result
+                    ) {
+
+                        if (result == null) {
+                            return;
+                        }
+
+                        android.location.Location location =
+                                result.getLastLocation();
+
+                        if (location == null) {
+                            return;
+                        }
+
+                        double latitude =
+                                location.getLatitude();
+
+                        double longitude =
+                                location.getLongitude();
+
+                        /*
+                         * Hozircha shu yerda lokatsiya olinadi.
+                         *
+                         * Keyingi bosqichda:
+                         * latitude + longitude
+                         * -> PHP API
+                         * -> bz_couriers
+                         * orqali serverga yuboramiz.
+                         */
+                        System.out.println(
+                                "BIRZUM LOCATION: "
+                                        + latitude
+                                        + ", "
+                                        + longitude
                         );
-
-
-        if (locationManager == null) {
-
-            stopSelf();
-
-            return;
-        }
-
-
-        locationListener =
-                new LocationListener() {
-
-                    @Override
-                    public void onLocationChanged(
-                            Location location
-                    ) {
-
-                        uploadLocation(
-                                location
-                        );
-                    }
-
-
-                    @Override
-                    public void onProviderEnabled(
-                            String provider
-                    ) {
-                    }
-
-
-                    @Override
-                    public void onProviderDisabled(
-                            String provider
-                    ) {
                     }
                 };
 
-
-        try {
-
-            locationManager.requestLocationUpdates(
-
-                    LocationManager.GPS_PROVIDER,
-
-                    10000,
-
-                    10,
-
-                    locationListener,
-
-                    Looper.getMainLooper()
-            );
-
-
-            if (ActivityCompat.checkSelfPermission(
-                    this,
-                    Manifest.permission.ACCESS_FINE_LOCATION
-            ) == PackageManager.PERMISSION_GRANTED
-                    ||
-                    ActivityCompat.checkSelfPermission(
-                            this,
-                            Manifest.permission.ACCESS_COARSE_LOCATION
-                    ) == PackageManager.PERMISSION_GRANTED) {
-
-
-                Location last =
-                        locationManager.getLastKnownLocation(
-                                LocationManager.GPS_PROVIDER
-                        );
-
-
-                if (last != null) {
-
-                    uploadLocation(last);
-                }
-            }
-
-        } catch (Exception e) {
-
-            Log.e(
-                    TAG,
-                    "GPS start failed",
-                    e
-            );
-        }
+        fusedLocationClient.requestLocationUpdates(
+                request,
+                locationCallback,
+                Looper.getMainLooper()
+        );
     }
-
-
-    private void uploadLocation(
-            Location location
-    ) {
-
-        final double lat =
-                location.getLatitude();
-
-
-        final double lng =
-                location.getLongitude();
-
-
-        String cookie =
-                prefs.getString(
-                        "cookie",
-                        ""
-                );
-
-
-        String csrf =
-                prefs.getString(
-                        "csrf",
-                        ""
-                );
-
-
-        if (cookie.isEmpty()) {
-
-            Log.w(
-                    TAG,
-                    "No session cookie"
-            );
-
-            return;
-        }
-
-
-        if (csrf.isEmpty()) {
-
-            Log.w(
-                    TAG,
-                    "No CSRF token"
-            );
-
-            return;
-        }
-
-
-        new Thread(() -> {
-
-            boolean success =
-                    LocationUploader.send(
-                            lat,
-                            lng,
-                            cookie,
-                            csrf
-                    );
-
-
-            Log.d(
-                    TAG,
-                    "Location: " +
-                            lat +
-                            ", " +
-                            lng +
-                            " success=" +
-                            success
-            );
-
-        }).start();
-    }
-
 
     @Override
     public int onStartCommand(
@@ -368,36 +208,31 @@ public class LocationForegroundService extends Service {
             int startId
     ) {
 
+        /*
+         * Android service'ni o'ldirsa,
+         * imkon bo'lsa qayta yaratadi.
+         */
         return START_STICKY;
     }
-
 
     @Override
     public void onDestroy() {
 
-        try {
+        if (fusedLocationClient != null
+                && locationCallback != null) {
 
-            if (locationManager != null
-                    &&
-                    locationListener != null) {
-
-                locationManager.removeUpdates(
-                        locationListener
-                );
-            }
-
-        } catch (Exception ignored) {
+            fusedLocationClient
+                    .removeLocationUpdates(
+                            locationCallback
+                    );
         }
-
 
         super.onDestroy();
     }
 
-
     @Nullable
     @Override
     public IBinder onBind(Intent intent) {
-
         return null;
     }
-            }
+}
