@@ -6,13 +6,13 @@ import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
-import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.media.AudioAttributes;
-import android.media.RingtoneManager;
 import android.net.Uri;
 import android.os.Build;
 
+import androidx.annotation.NonNull;
+import androidx.core.app.ActivityCompat;
 import androidx.core.app.NotificationCompat;
 import androidx.core.app.NotificationManagerCompat;
 
@@ -22,81 +22,45 @@ import com.google.firebase.messaging.RemoteMessage;
 public class BirZumFirebaseMessagingService
         extends FirebaseMessagingService {
 
-    /*
-     * Yangi channel ID.
-     *
-     * Oldingi birzum_orders channelining Androiddagi
-     * eski sozlamalarini chetlab o'tish uchun V2 ishlatyapmiz.
-     */
     private static final String CHANNEL_ID =
-            "birzum_orders_v2";
-
-    private static final String PREFS =
-            "birzum_delivery";
+            "birzum_orders_v3";
 
     @Override
-    public void onNewToken(String token) {
+    public void onCreate() {
+        super.onCreate();
 
+        createNotificationChannel();
+    }
+
+    @Override
+    public void onNewToken(@NonNull String token) {
         super.onNewToken(token);
 
-        if (
-                token == null ||
-                token.trim().isEmpty()
-        ) {
-            return;
-        }
-
-        SharedPreferences prefs =
-                getSharedPreferences(
-                        PREFS,
-                        Context.MODE_PRIVATE
-                );
-
-        /*
-         * Yangi Firebase tokenini saqlaymiz.
-         */
-        prefs.edit()
-                .putString(
-                        "fcm_token",
-                        token
-                )
-                .remove(
-                        "fcm_synced_token"
-                )
-                .putBoolean(
-                        "fcm_synced",
-                        false
-                )
+        getSharedPreferences(
+                "birzum24_prefs",
+                MODE_PRIVATE
+        )
+                .edit()
+                .putString("fcm_token", token)
+                .remove("fcm_synced_token")
                 .apply();
     }
 
     @Override
     public void onMessageReceived(
-            RemoteMessage remoteMessage
+            @NonNull RemoteMessage remoteMessage
     ) {
 
-        super.onMessageReceived(
-                remoteMessage
-        );
+        String title = "BirZum24";
+
+        String body = "Yangi buyurtma mavjud";
+
+        String orderId = "";
 
         /*
-         * Notification channelni oldindan yaratamiz.
+         * FCM notification payload
          */
-        createNotificationChannel();
-
-        String title =
-                "🚚 BirZum24";
-
-        String body =
-                "Sizga yangi buyurtma mavjud.";
-
-        /*
-         * Firebase notification payload.
-         */
-        if (
-                remoteMessage.getNotification()
-                        != null
-        ) {
+        if (remoteMessage.getNotification() != null) {
 
             String notificationTitle =
                     remoteMessage
@@ -108,82 +72,60 @@ public class BirZumFirebaseMessagingService
                             .getNotification()
                             .getBody();
 
-            if (
-                    notificationTitle != null &&
-                    !notificationTitle
-                            .trim()
-                            .isEmpty()
-            ) {
+            if (notificationTitle != null
+                    && !notificationTitle.isEmpty()) {
 
-                title =
-                        notificationTitle;
+                title = notificationTitle;
             }
 
-            if (
-                    notificationBody != null &&
-                    !notificationBody
-                            .trim()
-                            .isEmpty()
-            ) {
+            if (notificationBody != null
+                    && !notificationBody.isEmpty()) {
 
-                body =
-                        notificationBody;
+                body = notificationBody;
             }
         }
 
         /*
-         * Firebase data payload.
+         * FCM data payload
          */
-        String type =
-                remoteMessage
-                        .getData()
-                        .get("type");
+        if (!remoteMessage.getData().isEmpty()) {
 
-        String orderId =
-                remoteMessage
-                        .getData()
-                        .get("order_id");
+            String dataTitle =
+                    remoteMessage
+                            .getData()
+                            .get("title");
 
-        /*
-         * Agar data ichida title/body yuborilgan bo'lsa,
-         * ularni ham qo'llab-quvvatlaymiz.
-         */
-        String dataTitle =
-                remoteMessage
-                        .getData()
-                        .get("title");
+            String dataBody =
+                    remoteMessage
+                            .getData()
+                            .get("body");
 
-        String dataBody =
-                remoteMessage
-                        .getData()
-                        .get("body");
+            String dataOrderId =
+                    remoteMessage
+                            .getData()
+                            .get("order_id");
 
-        if (
-                dataTitle != null &&
-                !dataTitle
-                        .trim()
-                        .isEmpty()
-        ) {
+            if (dataTitle != null
+                    && !dataTitle.isEmpty()) {
 
-            title =
-                    dataTitle;
-        }
+                title = dataTitle;
+            }
 
-        if (
-                dataBody != null &&
-                !dataBody
-                        .trim()
-                        .isEmpty()
-        ) {
+            if (dataBody != null
+                    && !dataBody.isEmpty()) {
 
-            body =
-                    dataBody;
+                body = dataBody;
+            }
+
+            if (dataOrderId != null) {
+
+                orderId = dataOrderId;
+            }
         }
 
         showNotification(
                 title,
                 body,
-                type,
                 orderId
         );
     }
@@ -191,13 +133,27 @@ public class BirZumFirebaseMessagingService
     private void showNotification(
             String title,
             String body,
-            String type,
             String orderId
     ) {
 
+        NotificationManagerCompat manager =
+                NotificationManagerCompat.from(this);
+
         /*
-         * Notification bosilganda MainActivity ochiladi.
+         * Android 13+
          */
+        if (Build.VERSION.SDK_INT >=
+                Build.VERSION_CODES.TIRAMISU) {
+
+            if (ActivityCompat.checkSelfPermission(
+                    this,
+                    Manifest.permission.POST_NOTIFICATIONS
+            ) != PackageManager.PERMISSION_GRANTED) {
+
+                return;
+            }
+        }
+
         Intent intent =
                 new Intent(
                         this,
@@ -205,26 +161,13 @@ public class BirZumFirebaseMessagingService
                 );
 
         intent.setFlags(
-                Intent.FLAG_ACTIVITY_NEW_TASK |
-                Intent.FLAG_ACTIVITY_CLEAR_TOP |
-                Intent.FLAG_ACTIVITY_SINGLE_TOP
+                Intent.FLAG_ACTIVITY_NEW_TASK
+                        | Intent.FLAG_ACTIVITY_CLEAR_TOP
+                        | Intent.FLAG_ACTIVITY_SINGLE_TOP
         );
 
-        if (
-                type != null &&
-                !type.trim().isEmpty()
-        ) {
-
-            intent.putExtra(
-                    "notification_type",
-                    type
-            );
-        }
-
-        if (
-                orderId != null &&
-                !orderId.trim().isEmpty()
-        ) {
+        if (orderId != null
+                && !orderId.isEmpty()) {
 
             intent.putExtra(
                     "order_id",
@@ -232,229 +175,73 @@ public class BirZumFirebaseMessagingService
             );
         }
 
-        /*
-         * Har bir buyurtma uchun alohida PendingIntent.
-         */
-        int requestCode;
-
-        if (
-                orderId != null &&
-                !orderId.trim().isEmpty()
-        ) {
-
-            requestCode =
-                    Math.abs(
-                            orderId.hashCode()
-                    );
-
-        } else {
-
-            requestCode =
-                    (int)
-                    (
-                        System.currentTimeMillis()
-                        & 0x7fffffff
-                    );
-        }
-
         PendingIntent pendingIntent =
                 PendingIntent.getActivity(
                         this,
-                        requestCode,
+                        orderId == null
+                                ? 0
+                                : orderId.hashCode(),
                         intent,
-                        PendingIntent.FLAG_UPDATE_CURRENT |
-                        PendingIntent.FLAG_IMMUTABLE
+                        PendingIntent.FLAG_UPDATE_CURRENT
+                                | PendingIntent.FLAG_IMMUTABLE
                 );
 
-        /*
-         * Default Android notification sound.
-         */
-        Uri soundUri =
-                RingtoneManager
-                        .getDefaultUri(
-                                RingtoneManager
-                                        .TYPE_NOTIFICATION
-                        );
-
-        /*
-         * Notification builder.
-         */
         NotificationCompat.Builder builder =
                 new NotificationCompat.Builder(
                         this,
                         CHANNEL_ID
                 )
+                        .setSmallIcon(
+                                R.drawable.ic_launcher
+                        )
+                        .setContentTitle(title)
+                        .setContentText(body)
+                        .setStyle(
+                                new NotificationCompat.BigTextStyle()
+                                        .bigText(body)
+                        )
+                        .setContentIntent(pendingIntent)
+                        .setAutoCancel(true)
+                        .setOngoing(false)
+                        .setPriority(
+                                NotificationCompat.PRIORITY_HIGH
+                        )
+                        .setCategory(
+                                NotificationCompat.CATEGORY_MESSAGE
+                        )
+                        .setVisibility(
+                                NotificationCompat.VISIBILITY_PUBLIC
+                        )
+                        .setDefaults(
+                                NotificationCompat.DEFAULT_ALL
+                        )
+                        .setWhen(
+                                System.currentTimeMillis()
+                        )
+                        .setShowWhen(true);
 
-                /*
-                 * Android notification icon.
-                 */
-                .setSmallIcon(
-                        R.drawable.ic_launcher
-                )
-
-                .setContentTitle(
-                        title
-                )
-
-                .setContentText(
-                        body
-                )
-
-                .setStyle(
-                        new NotificationCompat
-                                .BigTextStyle()
-                                .bigText(body)
-                )
-
-                /*
-                 * Yuqori priority.
-                 */
-                .setPriority(
-                        NotificationCompat
-                                .PRIORITY_MAX
-                )
-
-                /*
-                 * Message notification.
-                 */
-                .setCategory(
-                        NotificationCompat
-                                .CATEGORY_MESSAGE
-                )
-
-                /*
-                 * Notification bosilganda
-                 * avtomatik yopiladi.
-                 */
-                .setAutoCancel(
-                        true
-                )
-
-                .setContentIntent(
-                        pendingIntent
-                )
-
-                /*
-                 * Ovoz.
-                 */
-                .setSound(
-                        soundUri
-                )
-
-                /*
-                 * Vibratsiya.
-                 */
-                .setVibrate(
-                        new long[]{
-                                0,
-                                500,
-                                250,
-                                500
-                        }
-                )
-
-                /*
-                 * Lock screen'da ham ko'rinsin.
-                 */
-                .setVisibility(
-                        NotificationCompat
-                                .VISIBILITY_PUBLIC
-                )
-
-                /*
-                 * Notificationni groupga biriktirmaymiz.
-                 */
-                .setGroup(
-                        null
-                )
-
-                /*
-                 * Timestamp.
-                 */
-                .setWhen(
-                        System.currentTimeMillis()
-                )
-
-                .setShowWhen(
-                        true
-                );
-
-        /*
-         * Android 13+.
-         */
-        if (
-                Build.VERSION.SDK_INT >=
-                Build.VERSION_CODES.TIRAMISU
-        ) {
-
-            if (
-                    checkSelfPermission(
-                            Manifest.permission
-                                    .POST_NOTIFICATIONS
-                    )
-                    !=
-                    PackageManager
-                            .PERMISSION_GRANTED
-            ) {
-
-                /*
-                 * Permission bo'lmasa notificationni
-                 * Android ko'rsatmaydi.
-                 */
-                return;
-            }
-        }
-
-        NotificationManagerCompat manager =
-                NotificationManagerCompat
-                        .from(this);
-
-        /*
-         * Notificationlar butunlay o'chirilgan
-         * bo'lsa chiqarmaymiz.
-         */
-        if (
-                !manager.areNotificationsEnabled()
-        ) {
-
-            return;
-        }
-
-        /*
-         * Notification ID.
-         */
         int notificationId;
 
-        if (
-                orderId != null &&
-                !orderId.trim().isEmpty()
-        ) {
+        if (orderId != null
+                && !orderId.isEmpty()) {
 
-            notificationId =
-                    Math.abs(
-                            orderId.hashCode()
-                    );
+            try {
 
-            /*
-             * Hash 0 bo'lib qolmasin.
-             */
-            if (notificationId == 0) {
-                notificationId = 1;
+                notificationId =
+                        Integer.parseInt(orderId);
+
+            } catch (Exception e) {
+
+                notificationId =
+                        orderId.hashCode();
             }
 
         } else {
 
             notificationId =
-                    (int)
-                    (
-                        System.currentTimeMillis()
-                        & 0x7fffffff
-                    );
+                    (int) System.currentTimeMillis();
         }
 
-        /*
-         * Nihoyat notification.
-         */
         manager.notify(
                 notificationId,
                 builder.build()
@@ -463,13 +250,8 @@ public class BirZumFirebaseMessagingService
 
     private void createNotificationChannel() {
 
-        /*
-         * Android 8 dan oldin channel kerak emas.
-         */
-        if (
-                Build.VERSION.SDK_INT <
-                Build.VERSION_CODES.O
-        ) {
+        if (Build.VERSION.SDK_INT <
+                Build.VERSION_CODES.O) {
 
             return;
         }
@@ -484,82 +266,59 @@ public class BirZumFirebaseMessagingService
         }
 
         /*
-         * Default notification sound.
-         */
-        Uri soundUri =
-                RingtoneManager
-                        .getDefaultUri(
-                                RingtoneManager
-                                        .TYPE_NOTIFICATION
-                        );
-
-        /*
-         * Audio attributes.
-         */
-        AudioAttributes audioAttributes =
-                new AudioAttributes.Builder()
-                        .setUsage(
-                                AudioAttributes
-                                        .USAGE_NOTIFICATION
-                        )
-                        .setContentType(
-                                AudioAttributes
-                                        .CONTENT_TYPE_SONIFICATION
-                        )
-                        .build();
-
-        /*
-         * HIGH importance.
+         * Eski channel nomini ishlatmaymiz.
          *
-         * Bu pop-up/head-up notification uchun kerak.
+         * V3 yangi channel bo'lgani uchun Android
+         * uni qaytadan HIGH importance bilan yaratadi.
          */
         NotificationChannel channel =
                 new NotificationChannel(
                         CHANNEL_ID,
                         "BirZum24 buyurtmalar",
-                        NotificationManager
-                                .IMPORTANCE_HIGH
+                        NotificationManager.IMPORTANCE_HIGH
                 );
 
         channel.setDescription(
-                "BirZum24 yangi buyurtmalar"
+                "Yangi buyurtmalar haqida bildirishnomalar"
         );
 
-        /*
-         * Sound.
-         */
-        channel.setSound(
-                soundUri,
-                audioAttributes
-        );
-
-        /*
-         * Vibration.
-         */
-        channel.enableVibration(
-                true
-        );
+        channel.enableVibration(true);
 
         channel.setVibrationPattern(
                 new long[]{
                         0,
-                        500,
-                        250,
+                        300,
+                        200,
                         500
                 }
         );
 
-        /*
-         * Lock screen.
-         */
         channel.setLockscreenVisibility(
-                NotificationCompat
-                        .VISIBILITY_PUBLIC
+                android.app.Notification.VISIBILITY_PUBLIC
         );
 
         /*
-         * Notification channel yaratish.
+         * Default notification sound
          */
+        Uri sound =
+                android.provider.Settings.System
+                        .DEFAULT_NOTIFICATION_URI;
+
+        AudioAttributes audioAttributes =
+                new AudioAttributes.Builder()
+                        .setUsage(
+                                AudioAttributes.USAGE_NOTIFICATION
+                        )
+                        .setContentType(
+                                AudioAttributes.CONTENT_TYPE_SONIFICATION
+                        )
+                        .build();
+
+        channel.setSound(
+                sound,
+                audioAttributes
+        );
+
         manager.createNotificationChannel(
                 channel
         );
